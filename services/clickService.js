@@ -236,8 +236,13 @@ export function generateProjectKey(name = "advertiser") {
 }
 
 export function generateInstallScript(clientId, projectKey) {
-  const trackerUrl = process.env.NEXT_PUBLIC_TRACKER_URL || "/pm-click-shield.js";
-  return `<script src="${trackerUrl}" data-client-id="${clientId}" data-project-key="${projectKey}" async></script>`;
+  const trackerUrl = process.env.NEXT_PUBLIC_TRACKER_URL || (process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/pm-click-shield.js` : "/pm-click-shield.js");
+  return `<script
+  async
+  src="${trackerUrl}"
+  data-client-id="${clientId}"
+  data-project-key="${projectKey}">
+</script>`;
 }
 
 export async function fetchCurrentUser() {

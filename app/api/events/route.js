@@ -58,13 +58,15 @@ export async function POST(request) {
     .maybeSingle();
 
   if (advertiserError) return json({ ok: false, error: advertiserError.message }, { status: 500 });
-  if (!advertiser) return json({ ok: false, error: "invalid client_id or project_key" }, { status: 403 });
+  if (!advertiser) {
+    return json({ ok: false, error: "invalid client_id or project_key", message: "client_id 또는 project_key가 일치하지 않습니다." }, { status: 403 });
+  }
 
   const stayTime = Number(readValue(body, "stay_time", "stayTime") || Math.round(Number(readValue(body, "duration_ms", "durationMs") || 0) / 1000) || 0);
   const pageUrl = readValue(body, "page_url", "pageUrl") || body.url || "";
 
   if (eventType === "stay_time" || eventType === "pagehide" || eventType === "visibility_hidden") {
-    const { data: latestLog } = await supabase
+    const { data: latestLog, error: latestLogError } = await supabase
       .from("pm_click_logs")
       .select("id")
       .eq("advertiser_id", advertiser.id)
@@ -74,6 +76,8 @@ export async function POST(request) {
       .limit(1)
       .maybeSingle();
 
+    if (latestLogError) return json({ ok: false, error: latestLogError.message }, { status: 500 });
+
     if (latestLog?.id) {
       const { error: updateError } = await supabase
         .from("pm_click_logs")
@@ -82,7 +86,8 @@ export async function POST(request) {
       if (updateError) return json({ ok: false, error: updateError.message }, { status: 500 });
       return json({ ok: true, updated: true, logId: latestLog.id });
     }
-    return json({ ok: true, updated: false, reason: "matching log not found" });
+
+    return json({ ok: true, updated: false, message: "매칭되는 클릭 로그가 없어 체류시간을 업데이트하지 않았습니다." });
   }
 
   if (eventType === "conversion") {
@@ -100,7 +105,7 @@ export async function POST(request) {
     };
     const { error } = await supabase.from("pm_conversion_events").insert(payload);
     if (error && !String(error.message).includes("does not exist")) return json({ ok: false, error: error.message }, { status: 500 });
-    return json({ ok: true, stored: !error, todo: error ? "pm_conversion_events 테이블 생성 후 저장됩니다." : undefined });
+    return json({ ok: true, stored: !error, message: error ? "pm_conversion_events 테이블이 없어 conversion 이벤트 저장은 건너뛰었습니다." : "conversion 이벤트가 저장되었습니다." });
   }
 
   return json({ ok: true, ignored: true, eventType });

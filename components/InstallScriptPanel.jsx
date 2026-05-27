@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { CheckCircle2, Clipboard, Code2, Copy } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clipboard, Code2, Copy } from "lucide-react";
 import { Card, SectionDescription, SectionTitle, StatusBadge } from "@/components/ui";
 import { generateInstallScript } from "@/services/clickService";
 
-const trackerUrl = process.env.NEXT_PUBLIC_TRACKER_URL || "/pm-click-shield.js";
+const trackerUrl = process.env.NEXT_PUBLIC_TRACKER_URL || (process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/pm-click-shield.js` : "/pm-click-shield.js");
+const utmExample = "?utm_source=naver&utm_medium=cpc&utm_campaign=test_campaign&utm_term=invalid-click-test";
 
 export default function InstallScriptPanel({ advertisers = [] }) {
   const [copied, setCopied] = useState("");
@@ -16,6 +17,7 @@ export default function InstallScriptPanel({ advertisers = [] }) {
   }));
 
   async function copyScript(item) {
+    if (!item.clientId || !item.projectKey) return;
     const script = generateInstallScript(item.clientId, item.projectKey);
     try {
       await navigator.clipboard.writeText(script);
@@ -28,16 +30,16 @@ export default function InstallScriptPanel({ advertisers = [] }) {
 
   return (
     <Card id="scripts" className="no-print">
-      <SectionTitle icon={Clipboard} title="광고주별 설치 스크립트" right={<span className="text-xs text-slate-500">권한 범위 내 광고주</span>} />
+      <SectionTitle icon={Clipboard} title="광고주별 설치 스크립트" right={<span className="text-xs text-slate-500">운영 추적 URL: {trackerUrl}</span>} />
       <SectionDescription>
-        광고주 사이트의 head 태그에 설치할 추적 스크립트입니다. `NEXT_PUBLIC_TRACKER_URL`이 설정되어 있으면 해당 배포 URL을 사용합니다.
+        광고주 홈페이지에 삽입할 실제 운영용 추적 스크립트입니다. `NEXT_PUBLIC_TRACKER_URL`이 있으면 해당 값을 사용하고, 없으면 `NEXT_PUBLIC_APP_URL/pm-click-shield.js`를 사용합니다.
       </SectionDescription>
 
       <div className="grid gap-3 border-b border-line p-5 md:grid-cols-3">
         {[
-          ["1", "광고주 선택", "접근 권한이 있는 광고주의 client_id와 project_key가 포함된 스크립트를 복사합니다."],
-          ["2", "Head 태그 삽입", "광고주 사이트의 공통 head 영역 또는 랜딩 페이지 </head> 직전에 붙여 넣습니다."],
-          ["3", "수집 상태 확인", "테스트 페이지 접속 후 /api/collect 저장 여부와 대시보드 로그를 확인합니다."]
+          ["1", "테스트 페이지 1개에 먼저 삽입", "전체 사이트 적용 전 특정 테스트 페이지에 먼저 설치하고 사이트 깨짐 여부를 확인합니다."],
+          ["2", "하단 스크립트 영역에 삽입", "일반 HTML은 </body> 바로 위, 카페24/아임웹/워드프레스는 공통 하단 스크립트 또는 Footer Script 영역에 삽입합니다."],
+          ["3", "수집 여부 확인", "UTM 테스트 URL로 접속한 뒤 Supabase pm_click_logs 저장 여부와 대시보드 로그 노출을 확인합니다."]
         ].map(([step, title, body]) => (
           <div key={step} className="rounded-md border border-line bg-panelSoft p-4">
             <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-brand text-xs font-bold text-ink">{step}</span>
@@ -47,22 +49,27 @@ export default function InstallScriptPanel({ advertisers = [] }) {
         ))}
       </div>
 
-      <div className="border-b border-line px-5 py-4">
-        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-100">
-          <Code2 size={16} className="text-brand" />
-          Head 태그 삽입 예시
+      <div className="grid gap-4 border-b border-line p-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-100">
+            <Code2 size={16} className="text-brand" />
+            설치 코드 예시
+          </div>
+          <pre className="overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-300">
+{`<script
+  async
+  src="${trackerUrl}"
+  data-client-id="광고주 client_id"
+  data-project-key="광고주 project_key">
+</script>`}
+          </pre>
         </div>
-        <pre className="overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-300">
-{`<head>
-  <title>광고주 랜딩 페이지</title>
-  <script
-    async
-    src="${trackerUrl}"
-    data-client-id="광고주 client_id"
-    data-project-key="광고주 project_key">
-  </script>
-</head>`}
-        </pre>
+        <div className="rounded-md border border-line bg-panelSoft p-4">
+          <p className="text-sm font-semibold text-white">UTM 테스트 URL</p>
+          <p className="mt-2 text-xs leading-5 text-slate-500">설치 후 광고주 테스트 페이지 URL 뒤에 아래 파라미터를 붙여 접속합니다.</p>
+          <code className="mt-3 block break-all rounded bg-ink p-3 text-xs text-brand">{utmExample}</code>
+          <p className="mt-3 text-xs leading-5 text-slate-500">접속 후 5초 이상 머물렀다가 페이지를 닫거나 이동하면 `/api/events`로 체류시간이 전송됩니다.</p>
+        </div>
       </div>
 
       {copied && (
@@ -71,31 +78,47 @@ export default function InstallScriptPanel({ advertisers = [] }) {
           {copied} 설치 스크립트를 복사했습니다.
         </div>
       )}
+
       <div className="divide-y divide-line">
-        {scripts.map((item) => (
-          <div key={item.clientId} className="grid gap-4 px-5 py-5 xl:grid-cols-[0.65fr_1.4fr_0.45fr_0.55fr] xl:items-center">
-            <div>
-              <p className="text-sm font-semibold text-white">{item.advertiser}</p>
-              <p className="mt-1 font-mono text-xs text-slate-500">{item.clientId}</p>
-              <p className="mt-1 font-mono text-xs text-slate-600">{item.projectKey}</p>
+        {scripts.map((item) => {
+          const installable = Boolean(item.clientId && item.projectKey);
+          return (
+            <div key={`${item.advertiser}-${item.clientId || "missing"}`} className="grid gap-4 px-5 py-5 xl:grid-cols-[0.65fr_1.4fr_0.45fr_0.55fr] xl:items-center">
+              <div>
+                <p className="text-sm font-semibold text-white">{item.advertiser}</p>
+                <p className="mt-1 font-mono text-xs text-slate-500">{item.clientId || "client_id 없음"}</p>
+                <p className="mt-1 font-mono text-xs text-slate-600">{item.projectKey || "project_key 없음"}</p>
+              </div>
+              {installable ? (
+                <pre className="max-h-36 overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-300">
+                  {generateInstallScript(item.clientId, item.projectKey)}
+                </pre>
+              ) : (
+                <div className="flex items-center gap-2 rounded-md border border-warn/30 bg-warn/10 p-3 text-sm text-warn">
+                  <AlertCircle size={16} />
+                  client_id/project_key가 없어 설치할 수 없습니다. 광고주를 다시 발급하거나 DB 값을 확인하세요.
+                </div>
+              )}
+              <StatusBadge status={item.status} label={installable ? item.status : "설치 불가"} />
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-xs text-slate-500">최근 수집 {item.lastSeen}</span>
+                <button
+                  onClick={() => copyScript(item)}
+                  disabled={!installable}
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panelSoft px-3 text-xs font-semibold text-slate-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Copy size={14} />
+                  {copied === item.advertiser ? "복사 완료" : "복사"}
+                </button>
+              </div>
             </div>
-            <pre className="max-h-24 overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-300">
-              {generateInstallScript(item.clientId, item.projectKey)}
-            </pre>
-            <StatusBadge status={item.status} label={item.status} />
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs text-slate-500">최근 수집 {item.lastSeen}</span>
-              <button
-                onClick={() => copyScript(item)}
-                className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panelSoft px-3 text-xs font-semibold text-slate-300 hover:text-white"
-              >
-                <Copy size={14} />
-                {copied === item.advertiser ? "복사 완료" : "복사"}
-              </button>
-            </div>
+          );
+        })}
+        {scripts.length === 0 && (
+          <div className="px-5 py-10 text-center text-sm text-slate-500">
+            설치 스크립트를 표시할 광고주가 없습니다. 광고주를 먼저 생성하면 client_id와 project_key가 발급됩니다.
           </div>
-        ))}
-        {scripts.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-500">설치 스크립트를 표시할 광고주가 없습니다.</div>}
+        )}
       </div>
     </Card>
   );

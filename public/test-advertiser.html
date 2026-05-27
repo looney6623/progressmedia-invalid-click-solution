@@ -4,34 +4,144 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ProgressMedia Tracker Test</title>
-    <!--
-      테스트 방법:
-      1. Supabase에 등록된 광고주의 data-client-id, data-project-key로 아래 값을 교체하세요.
-      2. 이 페이지를 열고 5초 이상 머문 뒤 이동/새로고침하면 stay_time 이벤트가 전송됩니다.
-      3. 전환 테스트 버튼을 누르면 conversion 이벤트가 /api/events로 전송됩니다.
-    -->
-    <script
-      async
-      src="/pm-click-shield.js"
-      data-client-id="pm-test-client"
-      data-project-key="pk-test-project">
-    </script>
     <style>
-      body { margin: 0; min-height: 100vh; font-family: Arial, sans-serif; background: #101820; color: #e5eef7; display: grid; place-items: center; }
-      main { width: min(720px, calc(100% - 32px)); border: 1px solid #253241; background: #14202b; padding: 28px; border-radius: 8px; }
-      code { color: #3df2b8; }
-      button { height: 42px; border: 0; border-radius: 6px; background: #3df2b8; color: #101820; font-weight: 700; padding: 0 16px; cursor: pointer; }
-      p { line-height: 1.6; color: #aab6c3; }
+      body { margin: 0; min-height: 100vh; font-family: Arial, sans-serif; background: #101820; color: #e5eef7; }
+      main { width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0; }
+      section { border: 1px solid #253241; background: #14202b; padding: 22px; border-radius: 8px; margin-top: 16px; }
+      label { display: block; margin-top: 12px; font-size: 13px; color: #aab6c3; }
+      input { box-sizing: border-box; width: 100%; height: 40px; margin-top: 6px; border: 1px solid #253241; border-radius: 6px; background: #101820; color: #e5eef7; padding: 0 10px; }
+      code, pre { color: #3df2b8; }
+      pre { overflow: auto; min-height: 160px; border: 1px solid #253241; border-radius: 6px; background: #101820; padding: 14px; white-space: pre-wrap; }
+      button { min-height: 42px; border: 0; border-radius: 6px; background: #3df2b8; color: #101820; font-weight: 700; padding: 0 16px; cursor: pointer; margin-top: 14px; margin-right: 8px; }
+      button.secondary { background: #253241; color: #e5eef7; }
+      p, li { line-height: 1.65; color: #aab6c3; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
     <main>
-      <h1>ProgressMedia 추적 스크립트 테스트</h1>
-      <p>현재 페이지는 <code>/pm-click-shield.js</code>를 실제로 불러와 <code>/api/collect</code>와 <code>/api/events</code> 호출을 테스트합니다.</p>
-      <p>운영 테스트 전 script 태그의 <code>data-client-id</code>, <code>data-project-key</code> 값을 실제 광고주 값으로 교체하세요.</p>
-      <button onclick="window.pmClickShield && window.pmClickShield.trackConversion('test_conversion', { source: 'test-page' })">
-        conversion 이벤트 테스트
-      </button>
+      <h1>ProgressMedia 추적 스크립트 본 서버 QA</h1>
+      <p>
+        Cloudtype 배포 URL에서 이 페이지를 열고 실제 광고주의 <code>client_id</code>, <code>project_key</code>를 입력해
+        <code>/api/collect</code>와 <code>/api/events</code> 저장 흐름을 확인합니다.
+      </p>
+
+      <section>
+        <h2>1. 테스트 값 입력</h2>
+        <div class="grid">
+          <label>
+            client_id
+            <input id="clientId" placeholder="예: pm-shabu20-a1b2c3" />
+          </label>
+          <label>
+            project_key
+            <input id="projectKey" placeholder="예: pk_shabu20_1a2b3c4d" />
+          </label>
+        </div>
+        <label>
+          테스트 페이지 URL
+          <input id="pageUrl" />
+        </label>
+        <p>UTM 테스트 예시: <code>?utm_source=naver&utm_medium=cpc&utm_campaign=test_campaign&utm_term=invalid-click-test</code></p>
+        <button onclick="sendCollect()">/api/collect 수동 테스트</button>
+        <button class="secondary" onclick="sendStayTime()">/api/events 체류시간 테스트</button>
+        <button class="secondary" onclick="sendConversion()">conversion 이벤트 테스트</button>
+      </section>
+
+      <section>
+        <h2>2. 실제 설치 코드</h2>
+        <p>광고주 사이트에는 아래 형태로 설치합니다. 일반 HTML은 <code>&lt;/body&gt;</code> 바로 위, CMS는 Footer Script 영역에 삽입하세요.</p>
+        <pre id="scriptPreview"></pre>
+      </section>
+
+      <section>
+        <h2>3. 테스트 결과</h2>
+        <pre id="result">아직 테스트 전입니다.</pre>
+      </section>
     </main>
+
+    <script>
+      var visitorId = localStorage.getItem("pm_test_visitor_id") || "v_test_" + Math.random().toString(36).slice(2);
+      var sessionId = sessionStorage.getItem("pm_test_session_id") || "s_test_" + Math.random().toString(36).slice(2);
+      localStorage.setItem("pm_test_visitor_id", visitorId);
+      sessionStorage.setItem("pm_test_session_id", sessionId);
+      var startedAt = Date.now();
+
+      var clientInput = document.getElementById("clientId");
+      var projectInput = document.getElementById("projectKey");
+      var pageInput = document.getElementById("pageUrl");
+      var resultBox = document.getElementById("result");
+      var scriptPreview = document.getElementById("scriptPreview");
+      pageInput.value = window.location.href;
+
+      function getPayload(extra) {
+        var url = new URL(pageInput.value || window.location.href, window.location.href);
+        return Object.assign({
+          client_id: clientInput.value.trim(),
+          project_key: projectInput.value.trim(),
+          visitor_id: visitorId,
+          session_id: sessionId,
+          page_url: url.href,
+          referrer: document.referrer || "test-advertiser.html",
+          user_agent: navigator.userAgent,
+          utm_source: url.searchParams.get("utm_source") || "naver",
+          utm_medium: url.searchParams.get("utm_medium") || "cpc",
+          utm_campaign: url.searchParams.get("utm_campaign") || "test_campaign",
+          utm_term: url.searchParams.get("utm_term") || "invalid-click-test",
+          utm_content: url.searchParams.get("utm_content") || "",
+          page_count: 1
+        }, extra || {});
+      }
+
+      function updatePreview() {
+        scriptPreview.textContent = '<script\\n' +
+          '  async\\n' +
+          '  src="' + window.location.origin + '/pm-click-shield.js"\\n' +
+          '  data-client-id="' + (clientInput.value.trim() || "광고주 client_id") + '"\\n' +
+          '  data-project-key="' + (projectInput.value.trim() || "광고주 project_key") + '">\\n' +
+          '<\\/script>';
+      }
+
+      async function postJson(path, payload) {
+        resultBox.textContent = "요청 중...";
+        try {
+          var response = await fetch(path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          var json = await response.json();
+          resultBox.textContent = JSON.stringify({ status: response.status, body: json }, null, 2);
+        } catch (error) {
+          resultBox.textContent = JSON.stringify({ ok: false, error: error.message }, null, 2);
+        }
+      }
+
+      function sendCollect() {
+        postJson("/api/collect", getPayload({ event_type: "page_load" }));
+      }
+
+      function sendStayTime() {
+        postJson("/api/events", getPayload({
+          event_type: "stay_time",
+          stay_time: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
+          duration_ms: Math.max(1, Date.now() - startedAt)
+        }));
+      }
+
+      function sendConversion() {
+        postJson("/api/events", getPayload({
+          event_type: "conversion",
+          stay_time: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
+          duration_ms: Math.max(1, Date.now() - startedAt),
+          conversion_data: { source: "test-advertiser", action: "button_click" }
+        }));
+      }
+
+      clientInput.addEventListener("input", updatePreview);
+      projectInput.addEventListener("input", updatePreview);
+      updatePreview();
+    </script>
   </body>
 </html>

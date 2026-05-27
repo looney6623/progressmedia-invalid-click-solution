@@ -143,10 +143,48 @@ API가 `DB_ROLE_CONSTRAINT_MISMATCH`를 반환하면 위 SQL을 Supabase SQL Edi
 - `localStorage`에 visitor id 생성
 - `sessionStorage`에 session id 생성
 
+## 광고주 홈페이지 설치 절차
+
+1. `/advertisers`의 설치 스크립트 탭에서 광고주별 `client_id`, `project_key`가 포함된 코드를 복사합니다.
+2. 일반 HTML 사이트는 `</body>` 바로 위에 삽입합니다.
+3. 카페24, 아임웹, 워드프레스 같은 CMS는 공통 하단 스크립트 또는 Footer Script 영역에 삽입합니다.
+4. 전체 사이트 적용 전 테스트 페이지 1개에 먼저 삽입합니다.
+5. 사이트 화면이 깨지지 않는지 확인한 뒤 UTM 테스트 URL로 접속합니다.
+6. Supabase `pm_click_logs` 저장 여부와 대시보드 실시간 클릭 로그 노출 여부를 확인합니다.
+
+설치 코드 예시:
+
+```html
+<script
+  async
+  src="https://your-cloudtype-domain.example/pm-click-shield.js"
+  data-client-id="광고주 client_id"
+  data-project-key="광고주 project_key">
+</script>
+```
+
+UTM 테스트 URL 예시:
+
+```text
+https://advertiser.example/test-page?utm_source=naver&utm_medium=cpc&utm_campaign=test_campaign&utm_term=invalid-click-test
+```
+
+스크립트 제거 방법:
+
+- 광고주 사이트의 공통 Footer Script 또는 HTML에 삽입한 `<script src=".../pm-click-shield.js">` 태그를 삭제합니다.
+- CMS 캐시가 있으면 캐시를 비우고 테스트 페이지에서 네트워크 요청이 더 이상 발생하지 않는지 확인합니다.
+
+개인정보/위탁 고지:
+
+- 스크립트는 방문 식별을 위해 `localStorage`, `sessionStorage`를 사용합니다.
+- IP 원문은 저장하지 않고 서버에서 `ip_hash`, `ip_masked`만 저장합니다.
+- 광고주 개인정보처리방침 또는 광고/분석 도구 위탁 고지에 로그 수집 목적, 보관 기간, 수집 항목을 반영해야 합니다.
+
 테스트 페이지:
 
 - `/test-advertiser.html`
-- 파일 안의 `data-client-id`, `data-project-key`를 실제 광고주 값으로 바꿔 체류시간과 conversion 이벤트를 테스트할 수 있습니다.
+- 화면에서 `client_id`, `project_key`를 입력하고 `/api/collect`, `/api/events`, conversion 이벤트를 수동 테스트할 수 있습니다.
+- Cloudtype 배포 URL 기준으로 `https://배포도메인/test-advertiser.html`에 접속해 본 서버 수집 흐름을 확인합니다.
 
 ## /api/collect 테스트
 
@@ -185,6 +223,17 @@ curl -X POST "$NEXT_PUBLIC_APP_URL/api/collect" \
 
 Supabase SQL Editor에서 예시 쿼리:
 
+광고주별 발급 키 확인:
+
+```sql
+select id, name, client_id, project_key, site_url, status, created_at
+from public.pm_advertisers
+order by created_at desc
+limit 20;
+```
+
+최근 수집 로그 확인:
+
 ```sql
 select
   advertiser_id,
@@ -201,6 +250,27 @@ select
 from public.pm_click_logs
 order by created_at desc
 limit 20;
+```
+
+특정 `client_id` 기준 로그 확인:
+
+```sql
+select
+  created_at,
+  client_id,
+  ip_masked,
+  page_url,
+  referrer,
+  utm_source,
+  utm_medium,
+  utm_campaign,
+  click_status,
+  risk_score,
+  reason
+from public.pm_click_logs
+where client_id = '광고주 client_id'
+order by created_at desc
+limit 50;
 ```
 
 ## 실제 클릭 로그 기반 대시보드
