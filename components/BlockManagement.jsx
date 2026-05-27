@@ -1,28 +1,58 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { Ban, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
-import { Card, SectionTitle } from "@/components/ui";
+import { Card, SectionDescription, SectionTitle, StatusBadge } from "@/components/ui";
 import { getBlockRules } from "@/lib/clickData";
+import { number } from "@/lib/format";
 
-export default function BlockManagement({ manualBlocks, onAddBlock, onRemoveBlock }) {
+export default function BlockManagement({ manualBlocks, blockedLogs, onAddBlock, onRemoveBlock }) {
   const [ip, setIp] = useState("");
   const [reason, setReason] = useState("");
   const rules = getBlockRules();
+
+  const blockRows = useMemo(() => {
+    const manualRows = manualBlocks.map((item) => ({
+      ip: item.ip,
+      startedAt: item.createdAt,
+      reason: item.reason,
+      method: "수동 차단"
+    }));
+    const autoRows = Object.values(
+      blockedLogs.reduce((acc, log) => {
+        if (manualBlocks.some((item) => item.ip === log.ip)) return acc;
+        acc[log.ip] ||= {
+          ip: log.ip,
+          startedAt: log.createdAt.toLocaleString("ko-KR"),
+          reason: log.reason,
+          method: "자동 차단"
+        };
+        return acc;
+      }, {})
+    );
+    return [...manualRows, ...autoRows].slice(0, 24);
+  }, [blockedLogs, manualBlocks]);
 
   function submitBlock(event) {
     event.preventDefault();
     const trimmedIp = ip.trim();
     const trimmedReason = reason.trim();
     if (!trimmedIp || !trimmedReason) return;
-    onAddBlock({ ip: trimmedIp, reason: trimmedReason, createdAt: "방금 전" });
+    onAddBlock({ ip: trimmedIp, reason: trimmedReason, createdAt: new Date().toLocaleString("ko-KR"), method: "수동 차단" });
     setIp("");
     setReason("");
   }
 
+  function confirmRelease(ipAddress) {
+    if (window.confirm(`${ipAddress} 차단을 해제할까요?`)) {
+      onRemoveBlock(ipAddress);
+    }
+  }
+
   return (
-    <div id="blocks" className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+    <div id="blocks" className="grid gap-5 xl:grid-cols-[1fr_1fr]">
       <Card>
         <SectionTitle icon={SlidersHorizontal} title="차단 관리" />
+        <SectionDescription>자동 판정 규칙과 수동 차단 IP를 함께 관리합니다. 현재 수동 차단은 브라우저 상태값으로만 반영됩니다.</SectionDescription>
         <div className="divide-y divide-line">
           {rules.map((rule) => (
             <div key={rule.id} className="grid gap-3 px-5 py-4 md:grid-cols-[1fr_1.25fr_0.55fr_0.45fr] md:items-center">
@@ -67,25 +97,47 @@ export default function BlockManagement({ manualBlocks, onAddBlock, onRemoveBloc
         </Card>
 
         <Card>
-          <SectionTitle icon={Ban} title="수동 차단 목록" right={<span className="text-xs text-slate-500">{manualBlocks.length}개 IP</span>} />
-          <div className="divide-y divide-line">
-            {manualBlocks.map((item) => (
-              <div key={item.ip} className="flex items-center justify-between gap-3 px-5 py-4">
-                <div className="min-w-0">
-                  <p className="font-mono text-sm text-white">{item.ip}</p>
-                  <p className="mt-1 truncate text-xs text-slate-500">
-                    {item.reason} · {item.createdAt}
-                  </p>
-                </div>
-                <button
-                  onClick={() => onRemoveBlock(item.ip)}
-                  className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-line bg-panelSoft px-3 text-xs font-semibold text-slate-300 hover:text-danger"
-                >
-                  <Trash2 size={14} />
-                  차단 해제
-                </button>
-              </div>
-            ))}
+          <SectionTitle icon={Ban} title="차단 IP 목록" right={<span className="text-xs text-slate-500">{number(blockRows.length)}개 IP</span>} />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="bg-panelSoft text-xs uppercase text-slate-500">
+                <tr>
+                  {["IP", "차단 시작일", "차단 사유", "차단 방식", "관리"].map((head) => (
+                    <th key={head} className="px-4 py-3 font-semibold">
+                      {head}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {blockRows.map((item) => {
+                  const manual = item.method === "수동 차단";
+                  return (
+                    <tr key={`${item.method}-${item.ip}`}>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-white">{item.ip}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-400">{item.startedAt}</td>
+                      <td className="px-4 py-3 text-slate-300">{item.reason}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <StatusBadge status={manual ? "의심" : "차단"} label={item.method} />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {manual ? (
+                          <button
+                            onClick={() => confirmRelease(item.ip)}
+                            className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-panelSoft px-2 text-xs font-semibold text-slate-300 hover:text-danger"
+                          >
+                            <Trash2 size={14} />
+                            차단 해제
+                          </button>
+                        ) : (
+                          <span className="text-xs text-slate-600">자동 규칙</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </Card>
       </div>

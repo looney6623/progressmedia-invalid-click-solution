@@ -1,8 +1,8 @@
 import { Search } from "lucide-react";
 import { Card } from "@/components/ui";
 
-const advertisers = ["전체", "브랜드A", "병원B", "쇼핑몰C", "교육D", "금융E"];
-const mediaOptions = ["전체", "네이버 검색", "구글 검색", "카카오", "메타", "제휴 매체"];
+const advertisers = ["전체", "샤브20", "3분페이", "대주바이오", "바른숨병원", "온리원쇼핑몰"];
+const mediaOptions = ["전체", "네이버 검색", "구글 검색", "메타", "카카오", "제휴 매체"];
 const statusOptions = ["전체", "정상", "의심", "차단"];
 const dateOptions = ["오늘", "최근 7일", "최근 30일"];
 
@@ -28,6 +28,10 @@ function FilterSelect({ label, value, onChange, options }) {
 export default function FilterBar({ filters, setFilters }) {
   return (
     <Card className="p-5 no-print">
+      <div className="mb-4">
+        <p className="text-sm font-semibold text-white">통합 필터</p>
+        <p className="mt-1 text-xs text-slate-500">선택한 조건은 KPI, 차트, 로그, 리포트에 동시에 반영됩니다.</p>
+      </div>
       <div className="grid gap-4 lg:grid-cols-[repeat(4,minmax(0,1fr))_1.4fr]">
         <FilterSelect label="광고주" value={filters.advertiser} onChange={(advertiser) => setFilters((prev) => ({ ...prev, advertiser }))} options={advertisers} />
         <FilterSelect label="매체" value={filters.media} onChange={(media) => setFilters((prev) => ({ ...prev, media }))} options={mediaOptions} />

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { FileText, Printer } from "lucide-react";
-import { Card, SectionTitle, StatusBadge, TooltipBox, chartColors } from "@/components/ui";
+import { Card, SectionDescription, SectionTitle, StatusBadge, TooltipBox, chartColors } from "@/components/ui";
 import { currency } from "@/lib/clickData";
 import { number, percent } from "@/lib/format";
 
@@ -90,6 +90,7 @@ export default function AdvertiserReport({ advertiserStats, logs }) {
           </div>
         }
       />
+      <SectionDescription>광고주별 무효 클릭 현황을 운영 리포트 형태로 확인합니다. 인쇄 시 사이드바와 필터는 숨기고 본문만 출력됩니다.</SectionDescription>
 
       <div className="overflow-x-auto no-print">
         <table className="w-full min-w-[860px] text-left text-sm">
@@ -180,7 +181,9 @@ export default function AdvertiserReport({ advertiserStats, logs }) {
               <div className="space-y-2">
                 {detail.reasons.map((item, index) => (
                   <div key={item.reason} className="flex items-center justify-between rounded bg-panelSoft px-3 py-2 text-sm">
-                    <span className="text-slate-300">{index + 1}. {item.reason}</span>
+                    <span className="text-slate-300">
+                      {index + 1}. {item.reason}
+                    </span>
                     <strong className="text-warn">{item.count}건</strong>
                   </div>
                 ))}

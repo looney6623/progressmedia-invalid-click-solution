@@ -10,9 +10,9 @@ const navItems = [
   { id: "reports", label: "광고주 리포트", icon: FileText }
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ activeSection, onNavigate }) {
   return (
-    <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 border-r border-line bg-ink/95 px-4 py-5 lg:block">
+    <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 border-r border-line bg-ink/95 px-4 py-5 lg:block no-print">
       <div className="mb-8 flex items-center gap-3 px-2">
         <div className="flex h-10 w-10 items-center justify-center rounded-md bg-brand text-lg font-black text-ink">P</div>
         <div className="min-w-0">
@@ -21,19 +21,23 @@ export default function Sidebar() {
         </div>
       </div>
       <nav className="space-y-1">
-        {navItems.map(({ id, label, icon: Icon }, index) => (
-          <a
-            key={id}
-            href={`#${id}`}
-            className={clsx(
-              "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-panelSoft hover:text-white",
-              index === 0 && "bg-panelSoft text-white"
-            )}
-          >
-            <Icon size={17} />
-            {label}
-          </a>
-        ))}
+        {navItems.map(({ id, label, icon: Icon }) => {
+          const active = activeSection === id;
+          return (
+            <a
+              key={id}
+              href={`#${id}`}
+              onClick={() => onNavigate(id)}
+              className={clsx(
+                "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition",
+                active ? "bg-brand text-ink shadow-[0_0_24px_rgba(57,215,165,0.18)]" : "text-slate-400 hover:bg-panelSoft hover:text-white"
+              )}
+            >
+              <Icon size={17} />
+              {label}
+            </a>
+          );
+        })}
       </nav>
       <div className="absolute bottom-5 left-4 right-4 rounded-lg border border-line bg-panel p-4">
         <p className="text-xs font-semibold text-slate-400">실시간 방어 상태</p>
