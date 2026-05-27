@@ -88,6 +88,12 @@ create index if not exists idx_pm_click_logs_advertiser_time on public.pm_click_
 create index if not exists idx_pm_blocked_ips_advertiser on public.pm_blocked_ips(advertiser_id);
 create index if not exists idx_pm_reports_advertiser_date on public.pm_reports(advertiser_id, report_date desc);
 
+-- Existing production DBs may still have an older role constraint that only allows admin/marketer.
+-- Apply this block before issuing advertiser login accounts.
+alter table public.pm_profiles drop constraint if exists pm_profiles_role_check;
+alter table public.pm_profiles add constraint pm_profiles_role_check check (role in ('admin', 'marketer', 'advertiser'));
+notify pgrst, 'reload schema';
+
 -- Production tracking columns
 alter table public.pm_advertisers add column if not exists site_url text;
 alter table public.pm_advertisers add column if not exists project_key text;

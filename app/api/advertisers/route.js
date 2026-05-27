@@ -51,6 +51,17 @@ function apiError(message, status = 500) {
   return error;
 }
 
+function isRoleConstraintError(error) {
+  const message = error?.message || "";
+  return message.includes("pm_profiles_role_check") || message.includes("violates check constraint");
+}
+
+function roleConstraintMismatchError() {
+  const error = apiError("pm_profiles role 제약조건이 advertiser role을 허용하지 않습니다. AUTH_RLS_SCHEMA.sql을 반영해 주세요.", 500);
+  error.code = "DB_ROLE_CONSTRAINT_MISMATCH";
+  return error;
+}
+
 async function getRequester(supabase, request) {
   const token = bearerToken(request);
   if (!token) return { error: "로그인이 필요합니다.", status: 401 };
@@ -140,6 +151,32 @@ async function getOrCreateAdvertiserAuthUser(supabase, { email, password, contac
 
   if (error) return { error: error.message, status: 500 };
   return { user: data.user, existing: false };
+}
+
+async function cleanupPartialAdvertiser(supabase, advertiser) {
+  if (!advertiser?.id) return;
+
+  const { error: assignmentCleanupError } = await supabase
+    .from("pm_marketer_advertisers")
+    .delete()
+    .eq("advertiser_id", advertiser.id);
+  const { error: advertiserUserCleanupError } = await supabase
+    .from("pm_advertiser_users")
+    .delete()
+    .eq("advertiser_id", advertiser.id);
+  const { error: advertiserCleanupError } = await supabase
+    .from("pm_advertisers")
+    .delete()
+    .eq("id", advertiser.id);
+
+  if (assignmentCleanupError || advertiserUserCleanupError || advertiserCleanupError) {
+    console.error("[advertisers:create] partial advertiser data may remain", {
+      advertiserId: advertiser.id,
+      assignmentCleanupError: assignmentCleanupError?.message,
+      advertiserUserCleanupError: advertiserUserCleanupError?.message,
+      advertiserCleanupError: advertiserCleanupError?.message
+    });
+  }
 }
 
 export async function POST(request) {
@@ -232,7 +269,10 @@ export async function POST(request) {
         is_active: true
       });
 
-    if (profileError) throw apiError(profileError.message, 500);
+    if (profileError) {
+      if (isRoleConstraintError(profileError)) throw roleConstraintMismatchError();
+      throw apiError(profileError.message, 500);
+    }
 
     const { data: existingLink, error: existingLinkError } = await supabase
       .from("pm_advertiser_users")
@@ -285,9 +325,16 @@ export async function POST(request) {
     if (createdAuthUser && authUser?.id) {
       await supabase.auth.admin.deleteUser(authUser.id);
     }
-    if (advertiser?.id) {
-      await supabase.from("pm_advertisers").delete().eq("id", advertiser.id);
+    await cleanupPartialAdvertiser(supabase, advertiser);
+
+    if (error.code === "DB_ROLE_CONSTRAINT_MISMATCH") {
+      return NextResponse.json({
+        ok: false,
+        error: "DB_ROLE_CONSTRAINT_MISMATCH",
+        message: "pm_profiles role 제약조건이 advertiser role을 허용하지 않습니다. AUTH_RLS_SCHEMA.sql을 반영해 주세요."
+      }, { status: 500 });
     }
+
     return NextResponse.json({ ok: false, error: error.message || "광고주 생성에 실패했습니다." }, { status: error.status || 500 });
   }
 }

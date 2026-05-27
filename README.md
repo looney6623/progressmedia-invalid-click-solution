@@ -95,6 +95,24 @@ IP_HASH_SALT=change-me
 
 광고주 Auth 계정 생성은 반드시 서버 API Route에서만 처리합니다. `SUPABASE_SERVICE_ROLE_KEY`는 클라이언트 컴포넌트나 브라우저 번들에서 사용하지 않습니다.
 
+### 광고주 role 제약조건 확인
+
+광고주 Auth 계정 발급 전에 운영 Supabase DB의 `pm_profiles.role` check constraint가 `admin`, `marketer`, `advertiser` 3개 role을 모두 허용해야 합니다. 과거 스키마가 남아 있으면 광고주 생성 중 아래 오류가 발생할 수 있습니다.
+
+```text
+new row for relation "pm_profiles" violates check constraint "pm_profiles_role_check"
+```
+
+해결 SQL:
+
+```sql
+alter table public.pm_profiles drop constraint if exists pm_profiles_role_check;
+alter table public.pm_profiles add constraint pm_profiles_role_check check (role in ('admin', 'marketer', 'advertiser'));
+notify pgrst, 'reload schema';
+```
+
+API가 `DB_ROLE_CONSTRAINT_MISMATCH`를 반환하면 위 SQL을 Supabase SQL Editor에 반영한 뒤 광고주 생성을 다시 시도합니다.
+
 ## API Route
 
 상용화를 위한 서버 API 뼈대를 추가했습니다.
