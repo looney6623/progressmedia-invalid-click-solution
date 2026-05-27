@@ -13,6 +13,7 @@ const MOCK_SESSION_KEY = "pm_mock_user_email";
 let advertiserSequence = 6;
 let advertiserUserSequence = 3;
 let assignmentSequence = 5;
+let marketerSequence = 3;
 
 export let mockAdvertisers = [
   { id: "adv_001", name: "샤브20", clientId: "pm-shabu20", projectKey: "pk_shabu20_demo", siteUrl: "https://shabu20.example.com", status: "active", createdBy: "user_marketer_1" },
@@ -135,6 +136,57 @@ export async function signInWithEmail(email, password) {
 
   const user = mockUsers.find((item) => item.email.toLowerCase() === email.toLowerCase() && item.isActive);
   if (!user) return { ok: false, error: "등록되지 않았거나 비활성화된 mock 계정입니다." };
+  browserStorage()?.setItem(MOCK_SESSION_KEY, user.email);
+  return { ok: true, user };
+}
+
+export async function signUpMarketerAccount({ name, email, password, team }) {
+  if (hasSupabaseConfig()) {
+    const supabase = createSupabaseBrowserClient();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          role: "marketer",
+          team
+        }
+      }
+    });
+
+    if (error) return { ok: false, error: error.message };
+
+    if (data.user) {
+      const profile = {
+        id: data.user.id,
+        email,
+        name,
+        role: "marketer",
+        team,
+        is_active: true
+      };
+      await supabase.from("pm_profiles").upsert(profile);
+      return { ok: true, user: mapSupabaseProfile(profile) };
+    }
+
+    return { ok: true, user: await fetchCurrentUser() };
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const exists = mockUsers.some((user) => user.email.toLowerCase() === normalizedEmail);
+  if (exists) return { ok: false, error: "이미 등록된 이메일입니다." };
+
+  const user = {
+    id: `user_marketer_mock_${String(marketerSequence++).padStart(3, "0")}`,
+    email: normalizedEmail,
+    name,
+    role: "marketer",
+    team,
+    isActive: true
+  };
+
+  mockUsers = [user, ...mockUsers];
   browserStorage()?.setItem(MOCK_SESSION_KEY, user.email);
   return { ok: true, user };
 }

@@ -41,6 +41,7 @@ import {
   removeAdvertiserAssignment,
   signInWithEmail,
   signOut,
+  signUpMarketerAccount,
   updateAdvertiserUserPermission
 } from "@/services/clickService";
 
@@ -187,6 +188,14 @@ export default function DashboardApp() {
     return result;
   }
 
+  async function handleSignUp(payload) {
+    setLoginLoading(true);
+    const result = await signUpMarketerAccount(payload);
+    if (result.ok) await loadAuthContext(result.user || await fetchCurrentUser());
+    setLoginLoading(false);
+    return result;
+  }
+
   async function handleSignOut() {
     await signOut();
     await loadAuthContext(null);
@@ -233,8 +242,8 @@ export default function DashboardApp() {
   }
 
   if (!authReady) return <div className="min-h-screen bg-ink" />;
-  if (!user) return <LoginPage onSignIn={handleSignIn} loading={loginLoading} />;
-  if (user.role !== "admin" && myAdvertisers.length === 0) return <EmptyAssignment user={user} onSignOut={handleSignOut} />;
+  if (!user) return <LoginPage onSignIn={handleSignIn} onSignUp={handleSignUp} loading={loginLoading} />;
+  if (user.role === "advertiser" && myAdvertisers.length === 0) return <EmptyAssignment user={user} onSignOut={handleSignOut} />;
 
   return (
     <div className="min-h-screen text-slate-200">
