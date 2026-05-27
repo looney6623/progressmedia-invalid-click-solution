@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Building2, CheckCircle2, Code2, UsersRound } from "lucide-react";
 import AdvertiserCreatePanel from "@/components/AdvertiserCreatePanel";
 import AdvertiserUserManagement from "@/components/AdvertiserUserManagement";
+import EmptyAdvertiserState from "@/components/EmptyAdvertiserState";
 import InstallScriptPanel from "@/components/InstallScriptPanel";
 import { Card, StatusBadge } from "@/components/ui";
 import { number } from "@/lib/format";
@@ -17,6 +19,7 @@ const tabs = [
 ];
 
 export default function AdvertisersWorkspace() {
+  const searchParams = useSearchParams();
   const {
     user,
     myAdvertisers,
@@ -27,7 +30,8 @@ export default function AdvertisersWorkspace() {
     handleUpdateAdvertiserUserPermission,
     handleDeactivateAdvertiserUser
   } = useAppState();
-  const [activeTab, setActiveTab] = useState("list");
+  const initialTab = tabs.some((tab) => tab.id === searchParams.get("tab")) ? searchParams.get("tab") : "list";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const advertisers = user.role === "admin" ? allAdvertisers : myAdvertisers;
 
   const summary = useMemo(() => {
@@ -63,6 +67,7 @@ export default function AdvertisersWorkspace() {
         </div>
       </Card>
 
+      {user.role === "marketer" && advertisers.length === 0 && activeTab !== "create" && <EmptyAdvertiserState compact />}
       {activeTab === "list" && <AdvertiserList advertisers={advertisers} />}
       {activeTab === "create" && <AdvertiserCreatePanel currentUser={user} onCreateAdvertiser={handleCreateAdvertiser} />}
       {activeTab === "users" && (

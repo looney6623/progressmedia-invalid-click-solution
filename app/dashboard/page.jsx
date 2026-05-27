@@ -4,6 +4,7 @@ import AdvertiserChart from "@/components/AdvertiserChart";
 import AppShell from "@/components/AppShell";
 import ClickStatusChart from "@/components/ClickStatusChart";
 import ClickTrendChart from "@/components/ClickTrendChart";
+import EmptyAdvertiserState from "@/components/EmptyAdvertiserState";
 import FilterBar from "@/components/FilterBar";
 import KpiCards from "@/components/KpiCards";
 import MediaChart from "@/components/MediaChart";
@@ -15,6 +16,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell title="대시보드" description="접근 가능한 광고주의 클릭 현황과 무효클릭 위험 신호를 한눈에 확인합니다.">
+      {user?.role === "marketer" && myAdvertisers.length === 0 && <EmptyAdvertiserState />}
       <FilterBar filters={filters} setFilters={setFilters} advertiserOptions={advertisers} />
       <KpiCards summary={summary} />
       <div className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">

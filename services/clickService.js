@@ -9,6 +9,7 @@ import {
 import { createSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabaseClient";
 
 const MOCK_SESSION_KEY = "pm_mock_user_email";
+const MOCK_USERS_KEY = "pm_mock_users";
 const COMPANY_EMAIL_DOMAIN = "my-progress.co.kr";
 const COMPANY_EMAIL_PATTERN = /^[^\s@]+@my-progress\.co\.kr$/i;
 const COMPANY_EMAIL_ERROR = `회사 이메일만 가입 가능합니다. 허용 도메인: ${COMPANY_EMAIL_DOMAIN}`;
@@ -51,6 +52,37 @@ function browserStorage() {
   return window.sessionStorage;
 }
 
+function browserLocalStorage() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage;
+}
+
+function hydrateMockUsers() {
+  const stored = browserLocalStorage()?.getItem(MOCK_USERS_KEY);
+  if (!stored) return;
+  try {
+    const users = JSON.parse(stored);
+    if (!Array.isArray(users)) return;
+    const existingEmails = new Set(mockUsers.map((user) => user.email.toLowerCase()));
+    mockUsers = [...mockUsers, ...users.filter((user) => user?.email && !existingEmails.has(user.email.toLowerCase()))];
+  } catch {
+    // Ignore malformed development-only mock storage.
+  }
+}
+
+function persistMockUser(user) {
+  const storage = browserLocalStorage();
+  if (!storage) return;
+  let users = [];
+  try {
+    users = JSON.parse(storage.getItem(MOCK_USERS_KEY) || "[]");
+  } catch {
+    users = [];
+  }
+  const nextUsers = [user, ...users.filter((item) => item.email?.toLowerCase() !== user.email.toLowerCase())];
+  storage.setItem(MOCK_USERS_KEY, JSON.stringify(nextUsers));
+}
+
 function slugify(value) {
   return value
     .toLowerCase()
@@ -83,6 +115,31 @@ function mapSupabaseProfile(profile) {
     role: profile.role || "marketer",
     team: profile.team || "",
     isActive: profile.is_active !== false
+  };
+}
+
+function profileFromAuthUser(authUser) {
+  const metadata = authUser.user_metadata || {};
+  const metadataRole = ["admin", "marketer", "advertiser"].includes(metadata.role) ? metadata.role : null;
+  const role = metadataRole || (isAllowedCompanyEmail(authUser.email || "") ? "marketer" : "advertiser");
+  return {
+    id: authUser.id,
+    email: authUser.email,
+    name: metadata.name || authUser.email,
+    role,
+    team: metadata.team || "",
+    isActive: true
+  };
+}
+
+function profileToDb(profile) {
+  return {
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    role: profile.role,
+    team: profile.team,
+    is_active: profile.isActive
   };
 }
 
@@ -119,29 +176,30 @@ export async function fetchCurrentUser() {
       .eq("id", authUser.id)
       .maybeSingle();
 
-    return mapSupabaseProfile(profile) || {
-      id: authUser.id,
-      email: authUser.email,
-      name: authUser.email,
-      role: "advertiser",
-      team: "",
-      isActive: true
-    };
+    const mappedProfile = mapSupabaseProfile(profile);
+    if (mappedProfile) return mappedProfile;
+
+    const fallbackProfile = profileFromAuthUser(authUser);
+    await supabase.from("pm_profiles").upsert(profileToDb(fallbackProfile));
+    return fallbackProfile;
   }
 
+  hydrateMockUsers();
   const storedEmail = browserStorage()?.getItem(MOCK_SESSION_KEY);
   return mockUsers.find((user) => user.email === storedEmail && user.isActive) || null;
 }
 
 export async function signInWithEmail(email, password) {
+  const normalizedEmail = email.trim().toLowerCase();
   if (hasSupabaseConfig()) {
     const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error) return { ok: false, error: error.message };
     return { ok: true, user: await fetchCurrentUser() };
   }
 
-  const user = mockUsers.find((item) => item.email.toLowerCase() === email.toLowerCase() && item.isActive);
+  hydrateMockUsers();
+  const user = mockUsers.find((item) => item.email.toLowerCase() === normalizedEmail && item.isActive);
   if (!user) return { ok: false, error: "등록되지 않았거나 비활성화된 mock 계정입니다." };
   browserStorage()?.setItem(MOCK_SESSION_KEY, user.email);
   return { ok: true, user };
@@ -185,6 +243,7 @@ export async function signUpMarketerAccount({ name, email, password, team }) {
     return { ok: true, user: await fetchCurrentUser() };
   }
 
+  hydrateMockUsers();
   const exists = mockUsers.some((user) => user.email.toLowerCase() === normalizedEmail);
   if (exists) return { ok: false, error: "이미 등록된 이메일입니다." };
 
@@ -198,6 +257,7 @@ export async function signUpMarketerAccount({ name, email, password, team }) {
   };
 
   mockUsers = [user, ...mockUsers];
+  persistMockUser(user);
   browserStorage()?.setItem(MOCK_SESSION_KEY, user.email);
   return { ok: true, user };
 }
@@ -252,6 +312,7 @@ export async function fetchTeamMembers() {
     const { data } = await supabase.from("pm_profiles").select("id,email,name,role,team,is_active").order("name");
     return { items: (data || []).map(mapSupabaseProfile) };
   }
+  hydrateMockUsers();
   return { items: mockUsers };
 }
 
