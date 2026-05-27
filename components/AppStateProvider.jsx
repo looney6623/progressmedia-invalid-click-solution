@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { clickLogs, getAdvertiserStats, getHourlyTrend, getMediaStats, summarizeClicks } from "@/lib/clickData";
+import { getAdvertiserStats, getHourlyTrend, getMediaStats, summarizeClicks } from "@/lib/clickData";
 import { enrichWithManualBlocks, filterClicks } from "@/lib/filterClicks";
 import {
   assignAdvertiserToMarketer,
@@ -10,6 +10,7 @@ import {
   deactivateAdvertiserUser,
   fetchAdvertiserAssignments,
   fetchAdvertiserUsers,
+  fetchClickLogs,
   fetchCurrentUser,
   fetchMyAccessibleAdvertisers,
   fetchTeamMembers,
@@ -45,6 +46,8 @@ export function AppStateProvider({ children }) {
   const [teamMembers, setTeamMembers] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [advertiserUsers, setAdvertiserUsers] = useState([]);
+  const [sourceLogs, setSourceLogs] = useState([]);
+  const [dataError, setDataError] = useState("");
   const [filters, setFilters] = useState(initialFilters);
   const [manualBlocks, setManualBlocks] = useState(initialManualBlocks);
 
@@ -55,6 +58,8 @@ export function AppStateProvider({ children }) {
       setTeamMembers([]);
       setAssignments([]);
       setAdvertiserUsers([]);
+      setSourceLogs([]);
+      setDataError("");
       return;
     }
 
@@ -71,6 +76,12 @@ export function AppStateProvider({ children }) {
     setAssignments(assignmentResult.items);
     setAdvertiserUsers(advertiserUserResult.items);
     setFilters((prev) => ({ ...prev, advertiser: "전체" }));
+
+    const logResult = await fetchClickLogs({
+      advertiserIds: nextUser.role === "admin" ? undefined : advertiserResult.items.map((item) => item.id)
+    });
+    setSourceLogs(logResult.items || []);
+    setDataError(logResult.error || "");
   }
 
   useEffect(() => {
@@ -101,6 +112,11 @@ export function AppStateProvider({ children }) {
     setMyAdvertisers(advertiserResult.items);
     setAdvertiserUsers(advertiserUserResult.items);
     setAssignments(assignmentResult.items);
+    const logResult = await fetchClickLogs({
+      advertiserIds: nextUser.role === "admin" ? undefined : advertiserResult.items.map((item) => item.id)
+    });
+    setSourceLogs(logResult.items || []);
+    setDataError(logResult.error || "");
   }
 
   async function handleSignIn(email, password) {
@@ -168,9 +184,9 @@ export function AppStateProvider({ children }) {
 
   const permissionLogs = useMemo(() => {
     if (!user) return [];
-    if (user.role === "admin") return clickLogs;
-    return clickLogs.filter((log) => allowedAdvertiserNames.includes(log.advertiser));
-  }, [allowedAdvertiserNames, user]);
+    if (user.role === "admin") return sourceLogs;
+    return sourceLogs.filter((log) => allowedAdvertiserNames.includes(log.advertiser));
+  }, [allowedAdvertiserNames, sourceLogs, user]);
 
   const blockedAwareLogs = useMemo(() => enrichWithManualBlocks(permissionLogs, manualBlocks), [manualBlocks, permissionLogs]);
   const filteredLogs = useMemo(() => filterClicks(blockedAwareLogs, filters), [blockedAwareLogs, filters]);
@@ -190,6 +206,7 @@ export function AppStateProvider({ children }) {
     teamMembers,
     assignments,
     advertiserUsers,
+    dataError,
     filters,
     setFilters,
     manualBlocks,

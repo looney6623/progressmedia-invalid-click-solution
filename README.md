@@ -100,10 +100,72 @@ IP_HASH_SALT=change-me
 
 동작:
 
-- `/api/collect`로 방문/클릭 수집 POST
-- `/api/events`로 체류시간 이벤트 POST
+- 최초 페이지 진입 시 `/api/collect`로 방문/클릭 수집 POST
+- `pagehide` 또는 `beforeunload` 시 `/api/events`로 체류시간 POST
+- UTM 파라미터, referrer, user_agent, page_url, visitor_id, session_id 수집
+- fetch 실패 시 콘솔 오류만 남기고 광고주 사이트 동작은 방해하지 않음
 - `localStorage`에 visitor id 생성
-- session id는 페이지 세션 단위로 생성
+- `sessionStorage`에 session id 생성
+
+테스트 페이지:
+
+- `/test-advertiser.html`
+- 파일 안의 `data-client-id`, `data-project-key`를 실제 광고주 값으로 바꿔 체류시간과 conversion 이벤트를 테스트할 수 있습니다.
+
+## /api/collect 테스트
+
+local/development 모드에서는 Supabase가 없어도 구조화된 mock 응답을 반환합니다. 운영 모드에서는 `pm_advertisers.client_id`, `pm_advertisers.project_key`가 일치해야 저장됩니다.
+
+```bash
+curl -X POST "$NEXT_PUBLIC_APP_URL/api/collect" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_id": "pm-client",
+    "project_key": "pk-project",
+    "visitor_id": "v-test",
+    "session_id": "s-test",
+    "page_url": "https://advertiser.example/landing",
+    "utm_source": "naver",
+    "utm_medium": "search",
+    "utm_campaign": "brand"
+  }'
+```
+
+검증:
+
+- 잘못된 `client_id/project_key`: 403
+- 정상 `client_id/project_key`: `pm_click_logs` 저장
+- 저장 컬럼: `ip_hash`, `ip_masked`, `user_agent`, `page_url`, `referrer`, UTM, `click_status`, `risk_score`, `reason`
+- IP 원문은 저장하지 않음
+
+## /api/events
+
+`/api/events`는 체류시간과 전환 이벤트를 수신합니다.
+
+- `event_type=stay_time`: 가장 최근 `visitor_id/session_id` 로그의 `stay_time` 업데이트
+- `event_type=conversion`: `pm_conversion_events` 테이블이 있으면 저장
+
+## Supabase 저장 확인
+
+Supabase SQL Editor에서 예시 쿼리:
+
+```sql
+select
+  advertiser_id,
+  client_id,
+  visitor_id,
+  session_id,
+  ip_hash,
+  ip_masked,
+  page_url,
+  click_status,
+  risk_score,
+  reason,
+  created_at
+from public.pm_click_logs
+order by created_at desc
+limit 20;
+```
 
 ## 개인정보/로그 정책
 
@@ -112,6 +174,18 @@ IP_HASH_SALT=change-me
 - `IP_HASH_SALT`는 서버 환경변수로만 사용합니다.
 - 기본 로그 보관기간은 `LOG_RETENTION_DAYS=90` 기준입니다.
 - 광고주별 데이터는 RLS와 `advertiser_id` 기준으로 분리해야 합니다.
+
+## 무효클릭 서버 판정 기준
+
+`/api/collect`는 저장 전 Supabase 데이터를 기준으로 초기 판정을 수행합니다.
+
+- 동일 `advertiser_id + ip_hash` 최근 10분 내 3회 이상: `suspicious`
+- 동일 `advertiser_id + ip_hash` 최근 10분 내 5회 이상: `blocked`
+- `stay_time` 3초 이하: 위험도 가중
+- `page_count` 0회: 위험도 가중
+- `pm_blocked_ips`에 등록된 `ip_hash`: `blocked`
+
+DB 조회 실패 시 과차단을 피하기 위해 안전하게 `normal` 또는 `suspicious`로 처리하고 reason에 실패 사유를 남깁니다.
 
 ## 화면 라우트
 

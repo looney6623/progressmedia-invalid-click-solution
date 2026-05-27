@@ -159,6 +159,40 @@ function advertiserFromDb(item) {
   };
 }
 
+function statusToUi(status) {
+  if (status === "blocked") return "차단";
+  if (status === "suspicious") return "의심";
+  return "정상";
+}
+
+function mapClickLogFromDb(item) {
+  const createdAt = new Date(item.created_at);
+  const hour = `${String(createdAt.getHours()).padStart(2, "0")}:00`;
+  const dateTime = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(createdAt.getDate()).padStart(2, "0")} ${String(createdAt.getHours()).padStart(2, "0")}:${String(createdAt.getMinutes()).padStart(2, "0")}`;
+  return {
+    id: item.id,
+    createdAt,
+    time: `${String(createdAt.getHours()).padStart(2, "0")}:${String(createdAt.getMinutes()).padStart(2, "0")}:${String(createdAt.getSeconds()).padStart(2, "0")}`,
+    dateTime,
+    hour,
+    advertiser: item.advertiser?.name || item.client_id || "광고주",
+    campaign: item.utm_campaign || "추적 스크립트",
+    keyword: item.utm_term || "-",
+    media: item.utm_source || item.referrer || "직접 유입",
+    ip: item.ip_masked || "-",
+    device: "-",
+    region: "-",
+    userAgent: item.user_agent || "-",
+    landingPage: item.page_url || "-",
+    dwellSeconds: item.stay_time || 0,
+    pageViews: item.page_count || 0,
+    cpc: Number(item.cpc || 0),
+    riskScore: item.risk_score || 0,
+    status: statusToUi(item.click_status),
+    reason: item.reason || "normal"
+  };
+}
+
 async function apiPost(path, payload) {
   const response = await fetch(path, {
     method: "POST",
@@ -501,7 +535,23 @@ export async function deactivateAdvertiserUser(advertiserUserId) {
 }
 
 export async function fetchClickLogs(filters = {}) {
-  return { items: clickLogs, total: clickLogs.length, filters };
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const supabase = createSupabaseBrowserClient();
+    let query = supabase
+      .from("pm_click_logs")
+      .select("id,advertiser_id,client_id,visitor_id,session_id,ip_masked,user_agent,page_url,referrer,utm_source,utm_medium,utm_campaign,utm_term,utm_content,stay_time,page_count,click_status,risk_score,reason,cpc,created_at,advertiser:pm_advertisers(name)")
+      .order("created_at", { ascending: false })
+      .limit(filters.limit || 500);
+
+    if (filters.advertiserIds?.length) query = query.in("advertiser_id", filters.advertiserIds);
+    const { data, error } = await query;
+    if (error) return { items: [], total: 0, error: error.message };
+    const items = (data || []).map(mapClickLogFromDb);
+    return { items, total: items.length };
+  }
+  if (mode === "mock") return { items: clickLogs, total: clickLogs.length, filters };
+  return { items: [], total: 0, error: getSupabaseConfigError() };
 }
 
 export async function fetchClickDashboard(logs = clickLogs) {

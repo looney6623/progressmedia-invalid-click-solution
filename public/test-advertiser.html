@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ProgressMedia Tracker Test</title>
+    <!--
+      테스트 방법:
+      1. Supabase에 등록된 광고주의 data-client-id, data-project-key로 아래 값을 교체하세요.
+      2. 이 페이지를 열고 5초 이상 머문 뒤 이동/새로고침하면 stay_time 이벤트가 전송됩니다.
+      3. 전환 테스트 버튼을 누르면 conversion 이벤트가 /api/events로 전송됩니다.
+    -->
+    <script
+      async
+      src="/pm-click-shield.js"
+      data-client-id="pm-test-client"
+      data-project-key="pk-test-project">
+    </script>
+    <style>
+      body { margin: 0; min-height: 100vh; font-family: Arial, sans-serif; background: #101820; color: #e5eef7; display: grid; place-items: center; }
+      main { width: min(720px, calc(100% - 32px)); border: 1px solid #253241; background: #14202b; padding: 28px; border-radius: 8px; }
+      code { color: #3df2b8; }
+      button { height: 42px; border: 0; border-radius: 6px; background: #3df2b8; color: #101820; font-weight: 700; padding: 0 16px; cursor: pointer; }
+      p { line-height: 1.6; color: #aab6c3; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>ProgressMedia 추적 스크립트 테스트</h1>
+      <p>현재 페이지는 <code>/pm-click-shield.js</code>를 실제로 불러와 <code>/api/collect</code>와 <code>/api/events</code> 호출을 테스트합니다.</p>
+      <p>운영 테스트 전 script 태그의 <code>data-client-id</code>, <code>data-project-key</code> 값을 실제 광고주 값으로 교체하세요.</p>
+      <button onclick="window.pmClickShield && window.pmClickShield.trackConversion('test_conversion', { source: 'test-page' })">
+        conversion 이벤트 테스트
+      </button>
+    </main>
+  </body>
+</html>

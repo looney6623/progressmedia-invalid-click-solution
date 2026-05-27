@@ -1,39 +1,100 @@
 import { NextResponse } from "next/server";
+import { detectInvalidClick } from "@/lib/serverInvalidClick";
 import { getRequestIp, hashIp, maskIp } from "@/lib/privacy";
 import { createSupabaseServiceClient, hasServerSupabaseConfig, isServerLocalMode, serverMode } from "@/lib/serverSupabase";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type"
+};
+
+function json(body, init = {}) {
+  return NextResponse.json(body, { ...init, headers: { ...corsHeaders, ...(init.headers || {}) } });
+}
+
+function readValue(body, snakeKey, camelKey) {
+  return body[snakeKey] ?? body[camelKey] ?? "";
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: corsHeaders });
+}
+
 export async function POST(request) {
   const body = await request.json().catch(() => ({}));
+  const clientId = readValue(body, "client_id", "clientId");
+  const projectKey = readValue(body, "project_key", "projectKey");
+  const visitorId = readValue(body, "visitor_id", "visitorId");
+  const sessionId = readValue(body, "session_id", "sessionId");
+  const pageUrl = readValue(body, "page_url", "pageUrl") || body.url;
+  const required = { client_id: clientId, project_key: projectKey, visitor_id: visitorId, session_id: sessionId, page_url: pageUrl };
+  const missing = Object.entries(required).filter(([, value]) => !value).map(([key]) => key);
+  if (missing.length) return json({ ok: false, error: `필수값이 없습니다: ${missing.join(", ")}` }, { status: 400 });
+
   const ip = getRequestIp(request);
-  const payload = {
-    client_id: body.clientId,
-    project_key: body.projectKey,
-    visitor_id: body.visitorId,
-    session_id: body.sessionId,
-    url: body.url,
-    referrer: body.referrer,
-    user_agent: request.headers.get("user-agent") || "",
-    ip_hash: hashIp(ip),
-    ip_masked: maskIp(ip),
-    received_at: new Date().toISOString()
-  };
+  const ipHash = hashIp(ip);
+  const ipMasked = maskIp(ip);
+  const userAgent = readValue(body, "user_agent", "userAgent") || request.headers.get("user-agent") || "";
 
   if (!hasServerSupabaseConfig()) {
     const localMode = isServerLocalMode();
-    return NextResponse.json({
+    return json({
       ok: localMode,
       mode: serverMode(),
       stored: false,
-      todo: "Supabase 연결 후 pm_click_logs 또는 visitor_sessions 저장으로 교체합니다.",
-      privacy: "IP 원문은 저장하지 않고 ip_hash/ip_masked만 사용합니다.",
       accepted: localMode,
+      todo: "Supabase 연결 후 pm_advertisers 검증과 pm_click_logs 저장을 수행합니다.",
+      privacy: "IP 원문은 저장하지 않고 ip_hash/ip_masked만 사용합니다.",
       error: localMode ? undefined : "운영 모드에서는 Supabase service role 설정이 필요합니다.",
-      payload
+      payload: { client_id: clientId, project_key: projectKey, visitor_id: visitorId, session_id: sessionId, page_url: pageUrl, ip_hash: ipHash, ip_masked: ipMasked }
     }, { status: localMode ? 200 : 503 });
   }
 
   const supabase = createSupabaseServiceClient();
-  const { error } = await supabase.from("pm_click_logs").insert(payload);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, stored: true });
+  const { data: advertiser, error: advertiserError } = await supabase
+    .from("pm_advertisers")
+    .select("id,client_id,project_key,status")
+    .eq("client_id", clientId)
+    .eq("project_key", projectKey)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (advertiserError) return json({ ok: false, error: advertiserError.message }, { status: 500 });
+  if (!advertiser) return json({ ok: false, error: "invalid client_id or project_key" }, { status: 403 });
+  if (!ipHash) return json({ ok: false, error: "IP_HASH_SALT 설정이 필요합니다." }, { status: 500 });
+
+  const stayTime = typeof body.stay_time === "number" ? body.stay_time : null;
+  const pageCount = Number(readValue(body, "page_count", "pageCount") || 1);
+  const detection = await detectInvalidClick({ supabase, advertiserId: advertiser.id, ipHash, stayTime, pageCount });
+  const createdAt = new Date().toISOString();
+  const payload = {
+    advertiser_id: advertiser.id,
+    client_id: clientId,
+    project_key: projectKey,
+    visitor_id: visitorId,
+    session_id: sessionId,
+    ip_hash: ipHash,
+    ip_masked: ipMasked,
+    user_agent: userAgent,
+    page_url: pageUrl,
+    referrer: body.referrer || "",
+    utm_source: body.utm_source || "",
+    utm_medium: body.utm_medium || "",
+    utm_campaign: body.utm_campaign || "",
+    utm_term: body.utm_term || "",
+    utm_content: body.utm_content || "",
+    stay_time: stayTime,
+    page_count: pageCount,
+    click_status: detection.clickStatus,
+    risk_score: detection.riskScore,
+    reason: detection.reason,
+    cpc: Number(body.cpc || 0),
+    created_at: createdAt
+  };
+
+  const { data: inserted, error: insertError } = await supabase.from("pm_click_logs").insert(payload).select("id,click_status,risk_score,reason,created_at").single();
+  if (insertError) return json({ ok: false, error: insertError.message }, { status: 500 });
+
+  return json({ ok: true, stored: true, log: inserted });
 }

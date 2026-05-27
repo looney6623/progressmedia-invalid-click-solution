@@ -88,6 +88,49 @@ create index if not exists idx_pm_click_logs_advertiser_time on public.pm_click_
 create index if not exists idx_pm_blocked_ips_advertiser on public.pm_blocked_ips(advertiser_id);
 create index if not exists idx_pm_reports_advertiser_date on public.pm_reports(advertiser_id, report_date desc);
 
+-- Production tracking columns
+alter table public.pm_advertisers add column if not exists site_url text;
+alter table public.pm_advertisers add column if not exists project_key text;
+alter table public.pm_advertisers add column if not exists created_by uuid references public.pm_profiles(id);
+
+alter table public.pm_click_logs add column if not exists client_id text;
+alter table public.pm_click_logs add column if not exists visitor_id text;
+alter table public.pm_click_logs add column if not exists session_id text;
+alter table public.pm_click_logs add column if not exists user_agent text;
+alter table public.pm_click_logs add column if not exists page_url text;
+alter table public.pm_click_logs add column if not exists referrer text;
+alter table public.pm_click_logs add column if not exists utm_source text;
+alter table public.pm_click_logs add column if not exists utm_medium text;
+alter table public.pm_click_logs add column if not exists utm_campaign text;
+alter table public.pm_click_logs add column if not exists utm_term text;
+alter table public.pm_click_logs add column if not exists utm_content text;
+alter table public.pm_click_logs add column if not exists stay_time integer;
+alter table public.pm_click_logs add column if not exists page_count integer;
+alter table public.pm_click_logs add column if not exists click_status text check (click_status in ('normal', 'suspicious', 'blocked'));
+alter table public.pm_click_logs add column if not exists cpc numeric not null default 0;
+alter table public.pm_click_logs add column if not exists created_at timestamp with time zone not null default now();
+
+create index if not exists idx_pm_click_logs_advertiser_created_at on public.pm_click_logs(advertiser_id, created_at desc);
+create index if not exists idx_pm_click_logs_ip_hash_created_at on public.pm_click_logs(ip_hash, created_at desc);
+create index if not exists idx_pm_click_logs_client_created_at on public.pm_click_logs(client_id, created_at desc);
+create index if not exists idx_pm_blocked_ips_advertiser_ip_hash on public.pm_blocked_ips(advertiser_id, ip_hash);
+
+create table if not exists public.pm_conversion_events (
+  id uuid primary key default gen_random_uuid(),
+  advertiser_id uuid not null references public.pm_advertisers(id) on delete cascade,
+  client_id text,
+  visitor_id text,
+  session_id text,
+  event_type text not null default 'conversion',
+  page_url text,
+  conversion_data jsonb not null default '{}'::jsonb,
+  ip_hash text,
+  ip_masked text,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.pm_conversion_events enable row level security;
+
 alter table public.pm_profiles enable row level security;
 alter table public.pm_advertisers enable row level security;
 alter table public.pm_marketer_advertisers enable row level security;
@@ -263,6 +306,10 @@ create policy "reports_admin_manage"
 on public.pm_reports for all
 using (public.pm_is_admin())
 with check (public.pm_is_admin());
+
+create policy "conversion_events_select_accessible"
+on public.pm_conversion_events for select
+using (public.pm_can_access_advertiser(advertiser_id));
 
 -- 운영 메모
 -- 1. 광고주 Auth 사용자 생성은 Supabase Admin API가 필요하므로 서버 API에서 service role key로 처리하세요.
