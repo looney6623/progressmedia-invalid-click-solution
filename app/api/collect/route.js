@@ -86,15 +86,27 @@ export async function POST(request) {
     utm_content: body.utm_content || "",
     stay_time: stayTime,
     page_count: pageCount,
-    click_status: detection.clickStatus,
-    risk_score: detection.riskScore,
+    click_status: detection.click_status,
+    risk_score: detection.risk_score,
     reason: detection.reason,
+    recent_count: detection.recent_count,
     cpc: Number(body.cpc || 0),
     created_at: createdAt
   };
 
-  const { data: inserted, error: insertError } = await supabase.from("pm_click_logs").insert(payload).select("id,click_status,risk_score,reason,created_at").single();
+  const { data: inserted, error: insertError } = await supabase.from("pm_click_logs").insert(payload).select("id,click_status,risk_score,reason,recent_count,created_at").single();
   if (insertError) return json({ ok: false, error: insertError.message }, { status: 500 });
 
-  return json({ ok: true, stored: true, log: inserted });
+  return json({
+    ok: true,
+    stored: true,
+    log: {
+      id: inserted.id,
+      click_status: inserted.click_status,
+      risk_score: inserted.risk_score,
+      reason: inserted.reason,
+      recent_count: inserted.recent_count,
+      created_at: inserted.created_at
+    }
+  });
 }

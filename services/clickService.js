@@ -201,7 +201,7 @@ function mapClickLogFromDb(item) {
     landingPage: item.page_url || "-",
     dwellSeconds: item.stay_time || 0,
     pageViews: item.page_count || 0,
-    clickCountIn10Min: item.click_count_10m || "-",
+    clickCountIn10Min: item.recent_count || item.click_count_10m || "-",
     cpc: Number(item.cpc || 0),
     riskScore: item.risk_score || 0,
     status: statusToUi(item.click_status),
@@ -210,6 +210,10 @@ function mapClickLogFromDb(item) {
 }
 
 async function apiPost(path, payload) {
+  return apiRequest(path, { method: "POST", payload });
+}
+
+async function apiRequest(path, { method = "GET", payload } = {}) {
   const headers = { "Content-Type": "application/json" };
   if (hasSupabaseConfig()) {
     const { data } = await createSupabaseBrowserClient().auth.getSession();
@@ -217,12 +221,12 @@ async function apiPost(path, payload) {
     if (token) headers.Authorization = `Bearer ${token}`;
   }
   const response = await fetch(path, {
-    method: "POST",
+    method,
     headers,
-    body: JSON.stringify(payload)
+    body: payload ? JSON.stringify(payload) : undefined
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) return { ok: false, error: body.error || "요청 처리에 실패했습니다." };
+  if (!response.ok) return { ...body, ok: false, error: body.error || body.message || "요청 처리에 실패했습니다." };
   return body;
 }
 
@@ -579,7 +583,7 @@ export async function fetchClickLogs(filters = {}) {
     const supabase = createSupabaseBrowserClient();
     let query = supabase
       .from("pm_click_logs")
-      .select("id,advertiser_id,client_id,visitor_id,session_id,ip_hash,ip_masked,user_agent,page_url,referrer,utm_source,utm_medium,utm_campaign,utm_term,utm_content,stay_time,page_count,click_status,risk_score,reason,cpc,created_at,advertiser:pm_advertisers(name)")
+      .select("id,advertiser_id,client_id,visitor_id,session_id,ip_hash,ip_masked,user_agent,page_url,referrer,utm_source,utm_medium,utm_campaign,utm_term,utm_content,stay_time,page_count,click_status,risk_score,reason,recent_count,cpc,created_at,advertiser:pm_advertisers(name)")
       .order("created_at", { ascending: false })
       .limit(filters.limit || 500);
 
@@ -605,39 +609,49 @@ export async function fetchBlockRules() {
   return { items: getBlockRules() };
 }
 
+function mapBlockedIpFromApi(item) {
+  return {
+    id: item.id,
+    advertiserId: item.advertiser_id,
+    advertiser: item.advertiser?.name || item.client_id || "광고주",
+    clientId: item.client_id,
+    ipHash: item.ip_hash,
+    ip: item.ip_masked || "-",
+    ipMasked: item.ip_masked || "-",
+    reason: item.reason || "-",
+    blockType: item.block_type || "manual",
+    source: item.source || "dashboard",
+    isActive: item.is_active !== false,
+    createdAt: item.created_at,
+    releasedAt: item.released_at,
+    method: item.block_type === "auto" ? "자동 차단" : "수동 차단"
+  };
+}
+
+export async function fetchBlockedIps() {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const result = await apiRequest("/api/blocked-ips");
+    if (!result.ok) return { items: [], error: result.error || result.message };
+    return { items: (result.items || []).map(mapBlockedIpFromApi) };
+  }
+  return { items: [] };
+}
+
 export async function createManualBlock(payload, currentUser) {
   const mode = ensureServiceMode();
   if (mode === "supabase") {
-    if (!payload.advertiserId || !payload.ipHash) {
-      return { ok: false, error: "차단 등록에는 advertiser_id와 ip_hash가 필요합니다." };
-    }
-
-    const { data, error } = await createSupabaseBrowserClient()
-      .from("pm_blocked_ips")
-      .insert({
-        advertiser_id: payload.advertiserId,
-        ip_hash: payload.ipHash,
-        ip_masked: payload.ipMasked || payload.ip || "-",
-        method: "manual",
-        reason: payload.reason,
-        created_by: currentUser?.id
-      })
-      .select("id,advertiser_id,ip_masked,method,reason,starts_at")
-      .single();
-
-    if (error) return { ok: false, error: `Supabase pm_blocked_ips 저장 실패: ${error.message}` };
-    return {
-      ok: true,
-      block: {
-        id: data.id,
-        advertiserId: data.advertiser_id,
-        ip: data.ip_masked,
-        ipMasked: data.ip_masked,
-        reason: data.reason,
-        method: "수동 차단",
-        createdAt: data.starts_at
-      }
-    };
+    const result = await apiPost("/api/blocked-ips", {
+      advertiser_id: payload.advertiserId,
+      client_id: payload.clientId,
+      ip_hash: payload.ipHash,
+      ip_masked: payload.ipMasked || payload.ip || "-",
+      reason: payload.reason,
+      block_type: "manual",
+      source: "dashboard"
+    });
+    if (!result.ok) return result;
+    return { ok: true, block: mapBlockedIpFromApi(result.block) };
   }
 
   if (mode === "unavailable") return serviceUnavailable();
@@ -645,6 +659,8 @@ export async function createManualBlock(payload, currentUser) {
 }
 
 export async function removeBlock(blockId) {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") return apiRequest("/api/blocked-ips", { method: "PATCH", payload: { id: blockId } });
   return { ok: true, releasedBlockId: blockId, releasedAt: "2026-05-27 14:30" };
 }
 

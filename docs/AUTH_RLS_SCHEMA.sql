@@ -60,13 +60,15 @@ create table if not exists public.pm_click_logs (
 create table if not exists public.pm_blocked_ips (
   id uuid primary key default gen_random_uuid(),
   advertiser_id uuid not null references public.pm_advertisers(id) on delete cascade,
+  client_id text,
   ip_hash text not null,
   ip_masked text,
-  method text not null check (method in ('manual', 'auto')),
   reason text,
-  created_by uuid references public.pm_profiles(id),
-  starts_at timestamp with time zone not null default now(),
-  ends_at timestamp with time zone,
+  block_type text not null default 'manual',
+  source text not null default 'dashboard',
+  is_active boolean not null default true,
+  created_by uuid references auth.users(id),
+  created_at timestamp with time zone not null default now(),
   released_at timestamp with time zone
 );
 
@@ -113,6 +115,7 @@ alter table public.pm_click_logs add column if not exists utm_content text;
 alter table public.pm_click_logs add column if not exists stay_time integer;
 alter table public.pm_click_logs add column if not exists page_count integer;
 alter table public.pm_click_logs add column if not exists click_status text check (click_status in ('normal', 'suspicious', 'blocked'));
+alter table public.pm_click_logs add column if not exists recent_count integer;
 alter table public.pm_click_logs add column if not exists cpc numeric not null default 0;
 alter table public.pm_click_logs add column if not exists created_at timestamp with time zone not null default now();
 
@@ -120,6 +123,16 @@ create index if not exists idx_pm_click_logs_advertiser_created_at on public.pm_
 create index if not exists idx_pm_click_logs_ip_hash_created_at on public.pm_click_logs(ip_hash, created_at desc);
 create index if not exists idx_pm_click_logs_client_created_at on public.pm_click_logs(client_id, created_at desc);
 create index if not exists idx_pm_blocked_ips_advertiser_ip_hash on public.pm_blocked_ips(advertiser_id, ip_hash);
+alter table public.pm_blocked_ips add column if not exists client_id text;
+alter table public.pm_blocked_ips add column if not exists block_type text not null default 'manual';
+alter table public.pm_blocked_ips add column if not exists source text not null default 'dashboard';
+alter table public.pm_blocked_ips add column if not exists is_active boolean not null default true;
+alter table public.pm_blocked_ips add column if not exists created_at timestamp with time zone not null default now();
+alter table public.pm_blocked_ips add column if not exists released_at timestamp with time zone;
+alter table public.pm_blocked_ips add column if not exists created_by uuid references auth.users(id);
+create unique index if not exists uniq_pm_blocked_ips_active on public.pm_blocked_ips(advertiser_id, ip_hash) where is_active = true;
+create index if not exists idx_pm_blocked_ips_client_created_at on public.pm_blocked_ips(client_id, created_at desc);
+create index if not exists idx_pm_blocked_ips_is_active on public.pm_blocked_ips(is_active);
 
 create table if not exists public.pm_conversion_events (
   id uuid primary key default gen_random_uuid(),

@@ -409,6 +409,58 @@ IP 정책:
 - `ip_hash`는 반복 클릭 집계와 `pm_blocked_ips` 저장 기준으로만 사용합니다.
 - IP 원문은 저장하거나 화면에 노출하지 않습니다.
 
+## 반복 클릭 자동 판정과 차단 관리
+
+`/api/collect`는 Supabase `pm_click_logs`, `pm_blocked_ips`를 기준으로 서버에서 무효클릭을 판정합니다.
+
+- 동일 `advertiser_id + ip_hash` 기준 최근 10분 내 3회 이상 클릭: `suspicious`
+- 동일 `advertiser_id + ip_hash` 기준 최근 10분 내 5회 이상 클릭: `blocked`
+- `pm_blocked_ips`에 활성 등록된 `ip_hash`: 즉시 `blocked`
+- `stay_time <= 3`: 위험도 가중
+- `page_count = 0`: 위험도 가중
+- IP 원문은 저장하지 않고 `ip_hash`, `ip_masked`만 사용
+
+`pm_blocked_ips` 주요 컬럼:
+
+```sql
+id uuid primary key default gen_random_uuid(),
+advertiser_id uuid references public.pm_advertisers(id) on delete cascade,
+client_id text,
+ip_hash text not null,
+ip_masked text,
+reason text,
+block_type text default 'manual',
+source text default 'dashboard',
+is_active boolean default true,
+created_by uuid references auth.users(id),
+created_at timestamptz default now(),
+released_at timestamptz
+```
+
+수동 차단 흐름:
+
+1. 차단 관리 화면에서 의심/차단 후보 로그의 `ip_masked`, `ip_hash`를 선택합니다.
+2. 광고주와 차단 사유를 확인하고 수동 차단을 등록합니다.
+3. 서버 API Route가 role별 접근 권한을 확인한 뒤 `pm_blocked_ips`에 저장합니다.
+4. 이후 같은 광고주의 동일 `ip_hash`는 `/api/collect`에서 즉시 `blocked`로 저장됩니다.
+5. 차단 해제는 `is_active=false`, `released_at=now()`로 처리합니다.
+
+차단 확인 SQL:
+
+```sql
+select id, advertiser_id, client_id, ip_masked, reason, block_type, source, is_active, created_at, released_at
+from public.pm_blocked_ips
+order by created_at desc
+limit 50;
+```
+
+반복 클릭 QA:
+
+1. 동일 `client_id/project_key`로 `/api/collect`를 3회 호출하면 `suspicious`가 반환되는지 확인합니다.
+2. 동일 조건으로 5회 호출하면 `blocked`가 반환되는지 확인합니다.
+3. `pm_blocked_ips`에 수동 차단 등록 후 같은 `ip_hash`의 `/api/collect`가 즉시 `blocked` 처리되는지 확인합니다.
+4. 차단 관리 화면에서 활성 차단 목록, 의심 후보 로그, 차단 후보 로그가 role 범위 내에서만 보이는지 확인합니다.
+
 광고주 생성 후 확인 SQL:
 
 ```sql

@@ -11,11 +11,13 @@ import {
   deactivateAdvertiserUser,
   fetchAdvertiserAssignments,
   fetchAdvertiserUsers,
+  fetchBlockedIps,
   fetchClickLogs,
   fetchCurrentUser,
   fetchMyAccessibleAdvertisers,
   fetchTeamMembers,
   mockAdvertisers,
+  removeBlock,
   removeAdvertiserAssignment,
   signInWithEmail,
   signOut,
@@ -64,11 +66,12 @@ export function AppStateProvider({ children }) {
       return;
     }
 
-    const [advertiserResult, memberResult, assignmentResult, advertiserUserResult] = await Promise.all([
+    const [advertiserResult, memberResult, assignmentResult, advertiserUserResult, blockResult] = await Promise.all([
       fetchMyAccessibleAdvertisers(nextUser),
       nextUser.role === "admin" ? fetchTeamMembers() : Promise.resolve({ items: [] }),
       nextUser.role === "admin" ? fetchAdvertiserAssignments() : Promise.resolve({ items: [] }),
-      nextUser.role !== "advertiser" ? fetchAdvertiserUsers(nextUser) : Promise.resolve({ items: [] })
+      nextUser.role !== "advertiser" ? fetchAdvertiserUsers(nextUser) : Promise.resolve({ items: [] }),
+      fetchBlockedIps()
     ]);
 
     setUser(nextUser);
@@ -76,6 +79,7 @@ export function AppStateProvider({ children }) {
     setTeamMembers(memberResult.items);
     setAssignments(assignmentResult.items);
     setAdvertiserUsers(advertiserUserResult.items);
+    setManualBlocks(blockResult.items?.length ? blockResult.items : initialManualBlocks);
     setFilters((prev) => ({ ...prev, advertiser: "전체" }));
 
     const logResult = await fetchClickLogs({
@@ -105,14 +109,16 @@ export function AppStateProvider({ children }) {
 
   async function refreshAccess(nextUser = user) {
     if (!nextUser) return;
-    const [advertiserResult, advertiserUserResult, assignmentResult] = await Promise.all([
+    const [advertiserResult, advertiserUserResult, assignmentResult, blockResult] = await Promise.all([
       fetchMyAccessibleAdvertisers(nextUser),
       nextUser.role !== "advertiser" ? fetchAdvertiserUsers(nextUser) : Promise.resolve({ items: [] }),
-      nextUser.role === "admin" ? fetchAdvertiserAssignments() : Promise.resolve({ items: assignments })
+      nextUser.role === "admin" ? fetchAdvertiserAssignments() : Promise.resolve({ items: assignments }),
+      fetchBlockedIps()
     ]);
     setMyAdvertisers(advertiserResult.items);
     setAdvertiserUsers(advertiserUserResult.items);
     setAssignments(assignmentResult.items);
+    if (blockResult.items) setManualBlocks(blockResult.items);
     const logResult = await fetchClickLogs({
       advertiserIds: nextUser.role === "admin" ? undefined : advertiserResult.items.map((item) => item.id)
     });
@@ -152,8 +158,17 @@ export function AppStateProvider({ children }) {
     return result;
   }
 
-  function removeManualBlock(ip) {
-    setManualBlocks((prev) => prev.filter((block) => block.ip !== ip));
+  async function removeManualBlock(idOrIp) {
+    const target = manualBlocks.find((block) => block.id === idOrIp || block.ip === idOrIp);
+    if (target?.id) {
+      const result = await removeBlock(target.id);
+      if (!result.ok) {
+        setDataError(result.error || "차단 해제에 실패했습니다.");
+        return result;
+      }
+    }
+    setManualBlocks((prev) => prev.filter((block) => block.id !== idOrIp && block.ip !== idOrIp));
+    return { ok: true };
   }
 
   async function handleAssign(marketerId, advertiserId) {
@@ -203,6 +218,7 @@ export function AppStateProvider({ children }) {
   const mediaStats = useMemo(() => getMediaStats(filteredLogs), [filteredLogs]);
   const hourlyTrend = useMemo(() => getHourlyTrend(filteredLogs), [filteredLogs]);
   const blockedLogs = useMemo(() => filteredLogs.filter((log) => log.status === "차단"), [filteredLogs]);
+  const suspiciousLogs = useMemo(() => filteredLogs.filter((log) => log.status === "의심"), [filteredLogs]);
 
   const value = {
     authReady,
@@ -220,6 +236,7 @@ export function AppStateProvider({ children }) {
     manualBlocks,
     filteredLogs,
     blockedLogs,
+    suspiciousLogs,
     summary,
     advertiserStats,
     mediaStats,
