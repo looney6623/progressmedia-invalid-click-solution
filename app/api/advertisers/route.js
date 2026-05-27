@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServiceClient, hasServerSupabaseConfig, isServerLocalMode, serverMode } from "@/lib/serverSupabase";
 
-function slugify(value) {
-  return value.toLowerCase().replace(/[^a-z0-9가-힣]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "advertiser";
+function slugify(value = "") {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24) || "advertiser";
 }
 
 function generateClientId(name) {
@@ -37,6 +43,12 @@ function mapAdvertiser(row) {
 function bearerToken(request) {
   const header = request.headers.get("authorization") || "";
   return header.startsWith("Bearer ") ? header.slice(7) : "";
+}
+
+function apiError(message, status = 500) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
 }
 
 async function getRequester(supabase, request) {
@@ -85,25 +97,31 @@ async function getRequester(supabase, request) {
 async function findAuthUserByEmail(supabase, email) {
   let page = 1;
   const perPage = 100;
+
   while (page <= 20) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-    if (error) throw new Error(error.message);
+    if (error) throw apiError(error.message, 500);
+
     const found = data.users.find((user) => normalizeEmail(user.email) === email);
     if (found) return found;
     if (data.users.length < perPage) return null;
     page += 1;
   }
+
   return null;
 }
 
 async function getOrCreateAdvertiserAuthUser(supabase, { email, password, contactName }) {
   const existingUser = await findAuthUserByEmail(supabase, email);
+
   if (existingUser) {
-    const { data: existingProfile } = await supabase
+    const { data: existingProfile, error: profileError } = await supabase
       .from("pm_profiles")
       .select("id,email,name,role,team,is_active")
       .eq("id", existingUser.id)
       .maybeSingle();
+
+    if (profileError) throw apiError(profileError.message, 500);
 
     const existingRole = existingProfile?.role || existingUser.user_metadata?.role;
     if (existingRole && existingRole !== "advertiser") {
@@ -136,7 +154,9 @@ export async function POST(request) {
 
   const required = { advertiserName, siteUrl, contactName, advertiserEmail, temporaryPassword };
   const missing = Object.entries(required).filter(([, value]) => !value).map(([key]) => key);
-  if (missing.length) return NextResponse.json({ ok: false, error: `필수값이 없습니다: ${missing.join(", ")}` }, { status: 400 });
+  if (missing.length) {
+    return NextResponse.json({ ok: false, error: `필수값이 없습니다: ${missing.join(", ")}` }, { status: 400 });
+  }
 
   const clientId = generateClientId(advertiserName);
   const projectKey = generateProjectKey(advertiserName);
@@ -157,8 +177,8 @@ export async function POST(request) {
   const supabase = createSupabaseServiceClient();
   const auth = await getRequester(supabase, request);
   if (auth.error) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
-  const requester = auth.requester;
 
+  const requester = auth.requester;
   let advertiser = null;
   let authUser = null;
   let createdAuthUser = false;
@@ -177,7 +197,7 @@ export async function POST(request) {
       .select("id,name,client_id,project_key,site_url,status,created_by")
       .single();
 
-    if (advertiserError) throw new Error(advertiserError.message);
+    if (advertiserError) throw apiError(advertiserError.message, 500);
     advertiser = advertiserRow;
 
     const { error: assignmentError } = await supabase
@@ -188,18 +208,16 @@ export async function POST(request) {
         permission: "manage"
       }, { onConflict: "marketer_id,advertiser_id" });
 
-    if (assignmentError) throw new Error(assignmentError.message);
+    if (assignmentError) throw apiError(assignmentError.message, 500);
 
     const authUserResult = await getOrCreateAdvertiserAuthUser(supabase, {
       email: advertiserEmail,
       password: temporaryPassword,
       contactName
     });
-    if (authUserResult.error) {
-      const error = new Error(authUserResult.error);
-      error.status = authUserResult.status || 500;
-      throw error;
-    }
+
+    if (authUserResult.error) throw apiError(authUserResult.error, authUserResult.status || 500);
+
     authUser = authUserResult.user;
     createdAuthUser = !authUserResult.existing;
 
@@ -214,7 +232,7 @@ export async function POST(request) {
         is_active: true
       });
 
-    if (profileError) throw new Error(profileError.message);
+    if (profileError) throw apiError(profileError.message, 500);
 
     const { data: existingLink, error: existingLinkError } = await supabase
       .from("pm_advertiser_users")
@@ -223,7 +241,7 @@ export async function POST(request) {
       .eq("advertiser_id", advertiser.id)
       .maybeSingle();
 
-    if (existingLinkError) throw new Error(existingLinkError.message);
+    if (existingLinkError) throw apiError(existingLinkError.message, 500);
 
     let advertiserUserLink = existingLink;
     if (!advertiserUserLink) {
@@ -238,11 +256,12 @@ export async function POST(request) {
         .select("id,user_id,advertiser_id,permission,created_by")
         .single();
 
-      if (linkError) throw new Error(linkError.message);
+      if (linkError) throw apiError(linkError.message, 500);
       advertiserUserLink = insertedLink;
     }
 
     const mappedAdvertiser = mapAdvertiser(advertiser);
+
     return NextResponse.json({
       ok: true,
       advertiser: mappedAdvertiser,
