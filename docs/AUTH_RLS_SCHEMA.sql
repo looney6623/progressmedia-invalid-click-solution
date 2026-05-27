@@ -279,6 +279,8 @@ create policy "click_logs_select_accessible"
 on public.pm_click_logs for select
 using (public.pm_can_access_advertiser(advertiser_id));
 
+notify pgrst, 'reload schema';
+
 create policy "click_logs_service_insert_only"
 on public.pm_click_logs for insert
 with check (false);

@@ -39,6 +39,7 @@ IP_HASH_SALT=change-me
 - `SUPABASE_SERVICE_ROLE_KEY`는 서버 API Route에서만 사용합니다.
 - `IP_HASH_SALT`는 서버에서 IP hash 생성에만 사용합니다.
 - 두 값에는 절대 `NEXT_PUBLIC_` 접두어를 붙이지 않습니다.
+- `.env.local`은 Git에 포함하지 않습니다.
 
 ## Supabase 연결 순서
 
@@ -76,6 +77,23 @@ IP_HASH_SALT=change-me
 - 임시 비밀번호
 
 생성 시 `client_id`, `project_key`를 자동 발급하고 `pm_advertisers`, `pm_marketer_advertisers` 저장 구조를 사용합니다. 광고주 Auth 계정 생성처럼 service role key가 필요한 작업은 클라이언트가 아니라 API Route에서 처리합니다.
+
+## 광고주 생성 플로우
+
+마케터가 광고주 생성 버튼을 클릭하면 `POST /api/advertisers` 서버 API Route가 아래 작업을 처리합니다.
+
+1. 현재 로그인 사용자의 Supabase session 확인
+2. `pm_profiles.role`이 `marketer` 또는 `admin`인지 확인
+3. `pm_advertisers`에 광고주 생성
+4. 현재 로그인 사용자와 `pm_marketer_advertisers` 연결
+5. Supabase Auth Admin API로 광고주 이메일 계정 생성
+6. `pm_profiles`에 `role='advertiser'` profile upsert
+7. `pm_advertiser_users`에 광고주 계정과 `advertiser_id` 연결
+8. 모든 단계 성공 시 `client_id`, `project_key`, 설치 스크립트, 광고주 로그인 정보 반환
+
+이미 같은 광고주 이메일의 Auth user가 있으면 기존 사용자를 조회합니다. 기존 role이 `advertiser`이면 profile/link를 보강하고, 기존 role이 `marketer` 또는 `admin`이면 충돌 오류를 반환합니다.
+
+광고주 Auth 계정 생성은 반드시 서버 API Route에서만 처리합니다. `SUPABASE_SERVICE_ROLE_KEY`는 클라이언트 컴포넌트나 브라우저 번들에서 사용하지 않습니다.
 
 ## API Route
 
@@ -166,6 +184,46 @@ from public.pm_click_logs
 order by created_at desc
 limit 20;
 ```
+
+광고주 생성 후 확인 SQL:
+
+```sql
+select id, name, client_id, project_key, site_url, created_by, created_at
+from public.pm_advertisers
+order by created_at desc
+limit 10;
+
+select ma.marketer_id, p.email as marketer_email, ma.advertiser_id, a.name as advertiser_name
+from public.pm_marketer_advertisers ma
+join public.pm_profiles p on p.id = ma.marketer_id
+join public.pm_advertisers a on a.id = ma.advertiser_id
+order by ma.assigned_at desc
+limit 10;
+
+select id, email, name, role, team, is_active
+from public.pm_profiles
+where role = 'advertiser'
+order by created_at desc
+limit 10;
+
+select au.user_id, p.email, au.advertiser_id, a.name, au.permission
+from public.pm_advertiser_users au
+join public.pm_profiles p on p.id = au.user_id
+join public.pm_advertisers a on a.id = au.advertiser_id
+order by au.created_at desc
+limit 10;
+```
+
+광고주 로그인 QA:
+
+1. 마케터로 로그인
+2. `/advertisers`에서 광고주명, 사이트 URL, 담당자명, 광고주 이메일, 임시 비밀번호 입력
+3. 광고주 생성 클릭
+4. Supabase Auth Users에 광고주 이메일 생성 확인
+5. 위 SQL로 `pm_advertisers`, `pm_marketer_advertisers`, `pm_profiles`, `pm_advertiser_users` 확인
+6. 로그아웃 후 광고주 이메일/임시 비밀번호로 로그인
+7. 광고주 계정에서 본인 광고주만 보이는지 확인
+8. 설치 스크립트의 `data-client-id`, `data-project-key`가 DB 값과 일치하는지 확인
 
 ## 개인정보/로그 정책
 

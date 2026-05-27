@@ -194,9 +194,15 @@ function mapClickLogFromDb(item) {
 }
 
 async function apiPost(path, payload) {
+  const headers = { "Content-Type": "application/json" };
+  if (hasSupabaseConfig()) {
+    const { data } = await createSupabaseBrowserClient().auth.getSession();
+    const token = data.session?.access_token;
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
   const response = await fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload)
   });
   const body = await response.json().catch(() => ({}));
@@ -417,7 +423,15 @@ export async function removeAdvertiserAssignment(assignmentId) {
 export async function createAdvertiserWithAccount(payload, currentUser) {
   const mode = ensureServiceMode();
   if (mode === "supabase") {
-    return apiPost("/api/advertisers", { ...payload, marketerId: currentUser.id });
+    return apiPost("/api/advertisers", {
+      advertiserName: payload.name,
+      siteUrl: payload.siteUrl,
+      contactName: payload.contactName,
+      advertiserEmail: payload.loginEmail,
+      temporaryPassword: payload.temporaryPassword,
+      permission: payload.permission,
+      status: payload.status
+    });
   }
   if (mode === "unavailable") return serviceUnavailable();
 
