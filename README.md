@@ -44,13 +44,24 @@ npm run build
   - `window.print()` 기반 인쇄 버튼
   - 인쇄 시 사이드바와 필터 숨김
 
+## docs 설계 문서
+
+서버 구매 전 실제 연동을 준비하기 위한 설계 문서를 `docs/`에 정리했습니다.
+
+- `docs/API_SPEC.md`: 수집, 이벤트, 로그 조회, 리포트, 차단, 광고주, 설치 스크립트 API 초안
+- `docs/DB_SCHEMA.md`: 광고주, 클릭 로그, 세션, 차단 IP, 전환 이벤트, 탐지 규칙, 리포트 내보내기 테이블 설계
+- `docs/TRACKING_SCRIPT_SPEC.md`: 광고주 사이트 삽입 스크립트, visitor/session 생성, UTM/referrer, 체류시간, 전환 이벤트, fallback 정책
+- `docs/BLOCKING_POLICY.md`: 무효클릭 판정 기준, 위험도, 차단 기간, 오탐 해제, 플랫폼 과금 차단과 사이트 접근 차단 차이
+- `docs/PRIVACY_LOG_POLICY.md`: IP 처리, cookie/localStorage 고지, 로그 보관, 광고주별 데이터 분리, 삭제 요청 대응
+- `docs/DEPLOYMENT_PLAN.md`: 서버리스 테스트, 서버 구매 후보, 1차 실서비스 일정표
+
 ## 더미 데이터
 
 광고주 예시는 광고대행 운영 업무에 맞춰 `샤브20`, `3분페이`, `대주바이오`, `바른숨병원`, `온리원쇼핑몰`로 구성했습니다. 매체는 `네이버 검색`, `구글 검색`, `메타`, `카카오`, `제휴 매체`를 사용합니다.
 
 ## 서버 미연동 상태
 
-현재 모든 데이터는 `lib/clickData.js`의 더미 데이터에서 생성됩니다. 수동 차단 IP, 설치 상태, 최근 수집 시간도 브라우저 상태 또는 정적 더미 값입니다.
+현재 모든 데이터는 `lib/clickData.js`의 더미 데이터에서 생성됩니다. 수동 차단 IP, 설치 상태, 최근 수집 시간도 브라우저 상태 또는 정적 더미 값입니다. `services/clickService.js`는 향후 실제 API로 교체하기 쉽도록 mock 함수 형태로 구성되어 있습니다.
 
 ## 향후 서버 연동 계획
 
@@ -80,6 +91,13 @@ components/
   InstallScriptPanel.jsx
   AdvertiserReport.jsx
   ui.js
+docs/
+  API_SPEC.md
+  DB_SCHEMA.md
+  TRACKING_SCRIPT_SPEC.md
+  BLOCKING_POLICY.md
+  PRIVACY_LOG_POLICY.md
+  DEPLOYMENT_PLAN.md
 lib/
   clickData.js
   detectInvalidClick.js
