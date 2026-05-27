@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
+import AdminManagement from "@/components/AdminManagement";
 import AdvertiserChart from "@/components/AdvertiserChart";
 import AdvertiserReport from "@/components/AdvertiserReport";
 import BlockManagement from "@/components/BlockManagement";
@@ -11,6 +12,7 @@ import ClickTrendChart from "@/components/ClickTrendChart";
 import FilterBar from "@/components/FilterBar";
 import InstallScriptPanel from "@/components/InstallScriptPanel";
 import KpiCards from "@/components/KpiCards";
+import LoginPage from "@/components/LoginPage";
 import MediaChart from "@/components/MediaChart";
 import Sidebar from "@/components/Sidebar";
 import { Card } from "@/components/ui";
@@ -23,6 +25,17 @@ import {
 } from "@/lib/clickData";
 import { downloadClickReportCsv } from "@/lib/exportCsv";
 import { enrichWithManualBlocks, filterClicks } from "@/lib/filterClicks";
+import {
+  assignAdvertiserToMarketer,
+  fetchAdvertiserAssignments,
+  fetchCurrentUser,
+  fetchMyAdvertisers,
+  fetchTeamMembers,
+  mockAdvertisers,
+  removeAdvertiserAssignment,
+  signInWithEmail,
+  signOut
+} from "@/services/clickService";
 
 const initialManualBlocks = [
   { ip: "211.44.18.91", reason: "샤브20 브랜드 키워드 반복 클릭", createdAt: "2026-05-27 14:29", method: "수동 차단" },
@@ -39,7 +52,30 @@ function SectionLead({ title, children }) {
   );
 }
 
+function EmptyAssignment({ user, onSignOut }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center px-5 py-10 text-slate-200">
+      <Card className="max-w-lg p-6 text-center">
+        <p className="text-xs font-semibold text-brand">NO ADVERTISER ASSIGNED</p>
+        <h1 className="mt-2 text-xl font-bold text-white">담당 광고주가 없습니다</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-400">
+          {user.name} 계정에는 아직 광고주가 배정되지 않았습니다. 관리자에게 광고주 배정을 요청해 주세요.
+        </p>
+        <button onClick={onSignOut} className="mt-5 rounded-md border border-line bg-panelSoft px-4 py-2 text-sm font-semibold text-slate-300">
+          로그아웃
+        </button>
+      </Card>
+    </main>
+  );
+}
+
 export default function DashboardApp() {
+  const [authReady, setAuthReady] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [myAdvertisers, setMyAdvertisers] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [filters, setFilters] = useState({
     advertiser: "전체",
     media: "전체",
@@ -50,8 +86,42 @@ export default function DashboardApp() {
   const [manualBlocks, setManualBlocks] = useState(initialManualBlocks);
   const [activeSection, setActiveSection] = useState("dashboard");
 
+  async function loadAuthContext(nextUser) {
+    if (!nextUser) {
+      setUser(null);
+      setMyAdvertisers([]);
+      setTeamMembers([]);
+      setAssignments([]);
+      return;
+    }
+    const [advertiserResult, memberResult, assignmentResult] = await Promise.all([
+      fetchMyAdvertisers(nextUser),
+      nextUser.role === "admin" ? fetchTeamMembers() : Promise.resolve({ items: [] }),
+      nextUser.role === "admin" ? fetchAdvertiserAssignments() : Promise.resolve({ items: [] })
+    ]);
+    setUser(nextUser);
+    setMyAdvertisers(advertiserResult.items);
+    setTeamMembers(memberResult.items);
+    setAssignments(assignmentResult.items);
+    setFilters((prev) => ({ ...prev, advertiser: "전체" }));
+  }
+
   useEffect(() => {
-    const sectionIds = ["dashboard", "logs", "analysis", "blocks", "scripts", "reports"];
+    let active = true;
+    fetchCurrentUser().then(async (currentUser) => {
+      if (!active) return;
+      await loadAuthContext(currentUser);
+      setAuthReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const sectionIds = user?.role === "admin"
+      ? ["dashboard", "logs", "analysis", "blocks", "scripts", "reports", "team", "assignments"]
+      : ["dashboard", "logs", "analysis", "blocks", "scripts", "reports"];
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -67,15 +137,34 @@ export default function DashboardApp() {
       if (element) observer.observe(element);
     });
     return () => observer.disconnect();
-  }, []);
+  }, [user?.role]);
 
-  const blockedAwareLogs = useMemo(() => enrichWithManualBlocks(clickLogs, manualBlocks), [manualBlocks]);
+  const allowedAdvertiserNames = useMemo(() => myAdvertisers.map((advertiser) => advertiser.name), [myAdvertisers]);
+  const permissionLogs = useMemo(() => {
+    if (!user) return [];
+    if (user.role === "admin") return clickLogs;
+    return clickLogs.filter((log) => allowedAdvertiserNames.includes(log.advertiser));
+  }, [allowedAdvertiserNames, user]);
+  const blockedAwareLogs = useMemo(() => enrichWithManualBlocks(permissionLogs, manualBlocks), [manualBlocks, permissionLogs]);
   const filteredLogs = useMemo(() => filterClicks(blockedAwareLogs, filters), [blockedAwareLogs, filters]);
   const summary = useMemo(() => summarizeClicks(filteredLogs), [filteredLogs]);
   const advertiserStats = useMemo(() => getAdvertiserStats(filteredLogs), [filteredLogs]);
   const mediaStats = useMemo(() => getMediaStats(filteredLogs), [filteredLogs]);
   const hourlyTrend = useMemo(() => getHourlyTrend(filteredLogs), [filteredLogs]);
   const blockedLogs = useMemo(() => filteredLogs.filter((log) => log.status === "차단"), [filteredLogs]);
+
+  async function handleSignIn(email, password) {
+    setLoginLoading(true);
+    const result = await signInWithEmail(email, password);
+    if (result.ok) await loadAuthContext(result.user || await fetchCurrentUser());
+    setLoginLoading(false);
+    return result;
+  }
+
+  async function handleSignOut() {
+    await signOut();
+    await loadAuthContext(null);
+  }
 
   function addManualBlock(item) {
     setManualBlocks((prev) => {
@@ -88,13 +177,33 @@ export default function DashboardApp() {
     setManualBlocks((prev) => prev.filter((block) => block.ip !== ip));
   }
 
-  function handleNavigate(id) {
-    setActiveSection(id);
+  async function handleAssign(marketerId, advertiserId) {
+    await assignAdvertiserToMarketer(marketerId, advertiserId);
+    const result = await fetchAdvertiserAssignments();
+    setAssignments(result.items);
+  }
+
+  async function handleRemoveAssignment(assignmentId) {
+    await removeAdvertiserAssignment(assignmentId);
+    const result = await fetchAdvertiserAssignments();
+    setAssignments(result.items);
+  }
+
+  if (!authReady) {
+    return <div className="min-h-screen bg-ink" />;
+  }
+
+  if (!user) {
+    return <LoginPage onSignIn={handleSignIn} loading={loginLoading} />;
+  }
+
+  if (user.role !== "admin" && myAdvertisers.length === 0) {
+    return <EmptyAssignment user={user} onSignOut={handleSignOut} />;
   }
 
   return (
     <div className="min-h-screen text-slate-200">
-      <Sidebar activeSection={activeSection} onNavigate={handleNavigate} />
+      <Sidebar activeSection={activeSection} onNavigate={setActiveSection} user={user} onSignOut={handleSignOut} />
 
       <main className="lg:pl-72">
         <header className="sticky top-0 z-10 border-b border-line bg-ink/88 backdrop-blur no-print">
@@ -102,6 +211,7 @@ export default function DashboardApp() {
             <div>
               <p className="text-xs font-semibold text-brand">INVALID CLICK PREVENTION</p>
               <h1 className="mt-1 text-xl font-bold tracking-normal text-white md:text-2xl">프로그레스미디어 무효클릭차단 솔루션</h1>
+              <p className="mt-1 text-xs text-slate-500">{user.name} · {user.email}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button className="rounded-md border border-line bg-panel px-3 py-2 text-xs font-semibold text-slate-300">{filters.dateRange}</button>
@@ -118,7 +228,7 @@ export default function DashboardApp() {
         </header>
 
         <div className="space-y-5 px-5 py-5 lg:px-8">
-          <FilterBar filters={filters} setFilters={setFilters} />
+          <FilterBar filters={filters} setFilters={setFilters} advertiserOptions={user.role === "admin" ? mockAdvertisers : myAdvertisers} />
           <div id="dashboard" className="space-y-5 scroll-mt-24">
             <SectionLead title="메인 대시보드">오늘 유입된 광고 클릭의 품질과 차단 효과를 한눈에 봅니다.</SectionLead>
             <KpiCards summary={summary} />
@@ -138,6 +248,15 @@ export default function DashboardApp() {
           <BlockManagement manualBlocks={manualBlocks} blockedLogs={blockedLogs} onAddBlock={addManualBlock} onRemoveBlock={removeManualBlock} />
           <InstallScriptPanel />
           <AdvertiserReport advertiserStats={advertiserStats} logs={filteredLogs} />
+          {user.role === "admin" && (
+            <AdminManagement
+              teamMembers={teamMembers}
+              advertisers={mockAdvertisers}
+              assignments={assignments}
+              onAssign={handleAssign}
+              onRemove={handleRemoveAssignment}
+            />
+          )}
         </div>
       </main>
     </div>

@@ -1,7 +1,7 @@
 import clsx from "clsx";
-import { Ban, Clipboard, FileText, LayoutDashboard, RadioTower, ShieldAlert } from "lucide-react";
+import { Ban, Clipboard, FileText, LayoutDashboard, LogOut, RadioTower, ShieldAlert, UserCog, Users } from "lucide-react";
 
-const navItems = [
+const baseNavItems = [
   { id: "dashboard", label: "메인 대시보드", icon: LayoutDashboard },
   { id: "logs", label: "실시간 클릭 로그", icon: RadioTower },
   { id: "analysis", label: "무효클릭 분석", icon: ShieldAlert },
@@ -10,7 +10,14 @@ const navItems = [
   { id: "reports", label: "광고주 리포트", icon: FileText }
 ];
 
-export default function Sidebar({ activeSection, onNavigate }) {
+const adminNavItems = [
+  { id: "team", label: "직원 계정 관리", icon: Users },
+  { id: "assignments", label: "광고주 배정 관리", icon: UserCog }
+];
+
+export default function Sidebar({ activeSection, onNavigate, user, onSignOut }) {
+  const navItems = user?.role === "admin" ? [...baseNavItems, ...adminNavItems] : baseNavItems;
+
   return (
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 border-r border-line bg-ink/95 px-4 py-5 lg:block no-print">
       <div className="mb-8 flex items-center gap-3 px-2">
@@ -39,11 +46,26 @@ export default function Sidebar({ activeSection, onNavigate }) {
           );
         })}
       </nav>
-      <div className="absolute bottom-5 left-4 right-4 rounded-lg border border-line bg-panel p-4">
-        <p className="text-xs font-semibold text-slate-400">실시간 방어 상태</p>
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-sm text-white">자동 차단 ON</span>
-          <span className="h-2.5 w-2.5 rounded-full bg-brand shadow-[0_0_18px_rgba(57,215,165,0.9)]" />
+      <div className="absolute bottom-5 left-4 right-4 space-y-3">
+        <div className="rounded-lg border border-line bg-panel p-4">
+          <p className="text-xs font-semibold text-slate-400">로그인 사용자</p>
+          <p className="mt-2 truncate text-sm font-semibold text-white">{user?.name}</p>
+          <p className="mt-1 truncate text-xs text-slate-500">{user?.email}</p>
+          <p className="mt-2 text-xs text-brand">{user?.role === "admin" ? "관리자" : "마케터"} · {user?.team}</p>
+          <button
+            onClick={onSignOut}
+            className="mt-3 inline-flex h-8 w-full items-center justify-center gap-2 rounded-md border border-line bg-panelSoft text-xs font-semibold text-slate-300 hover:text-white"
+          >
+            <LogOut size={14} />
+            로그아웃
+          </button>
+        </div>
+        <div className="rounded-lg border border-line bg-panel p-4">
+          <p className="text-xs font-semibold text-slate-400">실시간 방어 상태</p>
+          <div className="mt-3 flex items-center justify-between">
+            <span className="text-sm text-white">자동 차단 ON</span>
+            <span className="h-2.5 w-2.5 rounded-full bg-brand shadow-[0_0_18px_rgba(57,215,165,0.9)]" />
+          </div>
         </div>
       </div>
     </aside>

@@ -54,6 +54,54 @@ npm run build
 - `docs/BLOCKING_POLICY.md`: 무효클릭 판정 기준, 위험도, 차단 기간, 오탐 해제, 플랫폼 과금 차단과 사이트 접근 차단 차이
 - `docs/PRIVACY_LOG_POLICY.md`: IP 처리, cookie/localStorage 고지, 로그 보관, 광고주별 데이터 분리, 삭제 요청 대응
 - `docs/DEPLOYMENT_PLAN.md`: 서버리스 테스트, 서버 구매 후보, 1차 실서비스 일정표
+- `docs/AUTH_RLS_SCHEMA.sql`: Supabase Auth 프로필, 마케터-광고주 배정, RLS 정책 SQL 초안
+
+## Supabase Auth 설정
+
+현재 앱은 Supabase 환경변수가 없으면 mock 로그인으로 동작합니다. 실제 계정 연동 시 아래 환경변수를 배포 환경에 등록합니다.
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+```
+
+주의:
+
+- `SUPABASE_SERVICE_ROLE_KEY`는 클라이언트에 절대 넣지 않습니다.
+- service role key는 서버 API, Supabase Edge Function, 배치 작업에서만 사용합니다.
+- 브라우저에서는 anon key와 RLS 정책으로 접근 범위를 제한합니다.
+
+## Cloudtype 환경변수 설정
+
+Cloudtype 배포 시 프로젝트 환경변수에 아래 값을 등록합니다.
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+서비스 역할 키가 필요한 서버 API를 나중에 추가할 경우 서버 런타임 전용 환경변수로만 등록하고, `NEXT_PUBLIC_` prefix를 붙이지 않습니다.
+
+## 관리자/마케터 권한 구조
+
+- `admin`: 전체 광고주, 클릭 로그, 차단 IP, 리포트 조회/관리 가능
+- `marketer`: `pm_marketer_advertisers`에 배정된 광고주의 로그/차단/리포트만 조회 가능
+- 마케터의 수동 차단 등록은 담당 광고주 중 `manage` 권한이 있는 광고주에 한정하는 것을 권장합니다.
+- 관리자 전용 메뉴:
+  - 직원 계정 관리
+  - 광고주 배정 관리
+
+## Mock 로그인 fallback
+
+Supabase 환경변수가 없으면 아래 mock 계정으로 로그인할 수 있습니다.
+
+- `admin@progressmedia.co.kr` / 관리자
+- `marketer1@progressmedia.co.kr` / 윤인홍 / 담당 광고주: 샤브20, 3분페이
+- `marketer2@progressmedia.co.kr` / 마케터B / 담당 광고주: 대주바이오, 바른숨병원
+
+mock 모드에서는 입력한 비밀번호를 검증하지 않고 이메일만 확인합니다. 실제 운영 전에는 Supabase Auth와 RLS 적용이 필요합니다.
+
+## RLS 적용 필요성
+
+마케터 계정은 클라이언트에서 필터를 숨기는 것만으로는 보호되지 않습니다. Supabase 테이블에 RLS를 활성화하고, `auth.uid()` 기준으로 `pm_marketer_advertisers`에 배정된 광고주 데이터만 조회되도록 정책을 적용해야 합니다.
 
 ## 더미 데이터
 
@@ -98,6 +146,7 @@ docs/
   BLOCKING_POLICY.md
   PRIVACY_LOG_POLICY.md
   DEPLOYMENT_PLAN.md
+  AUTH_RLS_SCHEMA.sql
 lib/
   clickData.js
   detectInvalidClick.js

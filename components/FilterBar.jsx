@@ -1,7 +1,6 @@
 import { Search } from "lucide-react";
 import { Card } from "@/components/ui";
 
-const advertisers = ["전체", "샤브20", "3분페이", "대주바이오", "바른숨병원", "온리원쇼핑몰"];
 const mediaOptions = ["전체", "네이버 검색", "구글 검색", "메타", "카카오", "제휴 매체"];
 const statusOptions = ["전체", "정상", "의심", "차단"];
 const dateOptions = ["오늘", "최근 7일", "최근 30일"];
@@ -25,7 +24,9 @@ function FilterSelect({ label, value, onChange, options }) {
   );
 }
 
-export default function FilterBar({ filters, setFilters }) {
+export default function FilterBar({ filters, setFilters, advertiserOptions }) {
+  const advertisers = ["전체", ...advertiserOptions.map((item) => item.name)];
+
   return (
     <Card className="p-5 no-print">
       <div className="mb-4">
