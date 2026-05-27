@@ -80,14 +80,62 @@ Cloudtype 배포 시 프로젝트 환경변수에 아래 값을 등록합니다.
 
 서비스 역할 키가 필요한 서버 API를 나중에 추가할 경우 서버 런타임 전용 환경변수로만 등록하고, `NEXT_PUBLIC_` prefix를 붙이지 않습니다.
 
-## 관리자/마케터 권한 구조
+## 관리자/마케터/광고주 권한 구조
 
-- `admin`: 전체 광고주, 클릭 로그, 차단 IP, 리포트 조회/관리 가능
-- `marketer`: `pm_marketer_advertisers`에 배정된 광고주의 로그/차단/리포트만 조회 가능
-- 마케터의 수동 차단 등록은 담당 광고주 중 `manage` 권한이 있는 광고주에 한정하는 것을 권장합니다.
-- 관리자 전용 메뉴:
-  - 직원 계정 관리
-  - 광고주 배정 관리
+- `admin`: 전체 마케터, 전체 광고주, 전체 로그, 전체 리포트를 관리합니다.
+- `marketer`: 본인이 생성했거나 `pm_marketer_advertisers`에 배정된 광고주만 관리합니다.
+- `advertiser`: `pm_advertiser_users`에 연결된 본인 광고주의 로그, 차단, 리포트, 설치 스크립트만 확인합니다.
+- A 마케터가 a/b/c 광고주를, B 마케터가 d/e/f 광고주를 관리하는 식으로 데이터 범위를 완전히 분리합니다.
+
+역할별 메뉴:
+
+- admin: 전체 대시보드, 마케터 관리, 전체 광고주 관리, 전체 로그, 전체 리포트
+- marketer: 내 광고주, 광고주 생성, 실시간 클릭 로그, 무효클릭 분석, 차단 관리, 설치 스크립트, 광고주 리포트, 광고주 계정 관리
+- advertiser: 내 대시보드, 실시간 클릭 로그, 차단 관리, 리포트, 설치 스크립트 확인
+
+## 광고주 생성 플로우
+
+마케터는 대시보드의 `광고주 생성` 화면에서 아래 정보를 등록합니다.
+
+- 광고주명
+- 사이트 URL
+- 광고주 담당자명
+- 광고주 로그인 이메일
+- 권한: `view` 또는 `manage`
+- 상태: `active` 또는 `inactive`
+
+mock fallback에서는 광고주 생성과 동시에 다음 값이 자동 생성됩니다.
+
+- `client_id`
+- `project_key`
+- 설치 스크립트
+- 광고주 mock 계정
+- 현재 로그인한 마케터와 광고주 간 `manage` 배정
+
+실제 Supabase 연동에서는 광고주 Auth 사용자 생성이 Supabase Admin API를 필요로 하므로 service role key를 사용하는 서버 API에서 처리해야 합니다.
+
+## 광고주 계정 생성 플로우
+
+마케터는 `광고주 계정 관리` 화면에서 본인 담당 광고주의 광고주 계정을 추가로 만들 수 있습니다.
+
+- 광고주 계정 목록 조회
+- 계정 생성
+- 권한 변경
+- 비활성화
+- 임시 비밀번호 재발급 UI
+- 초대 링크 복사 UI
+
+`pm_advertiser_users` 테이블은 광고주 로그인 계정과 광고주를 연결합니다. 광고주 role 사용자는 이 테이블에 연결된 `advertiser_id` 범위만 조회할 수 있어야 합니다.
+
+## Supabase Auth 사용자 생성 방법
+
+권장 흐름:
+
+1. 관리자 또는 마케터가 앱에서 광고주 계정 생성을 요청합니다.
+2. 서버 API가 service role key로 Supabase Admin API를 호출해 Auth user를 생성합니다.
+3. 서버 API가 `pm_profiles`에 role `advertiser` 프로필을 생성합니다.
+4. 서버 API가 `pm_advertiser_users`에 `user_id`, `advertiser_id`, `permission`을 저장합니다.
+5. 광고주에게 초대 링크 또는 임시 비밀번호를 전달합니다.
 
 ## Mock 로그인 fallback
 
@@ -96,12 +144,20 @@ Supabase 환경변수가 없으면 아래 mock 계정으로 로그인할 수 있
 - `admin@progressmedia.co.kr` / 관리자
 - `marketer1@progressmedia.co.kr` / 윤인홍 / 담당 광고주: 샤브20, 3분페이
 - `marketer2@progressmedia.co.kr` / 마케터B / 담당 광고주: 대주바이오, 바른숨병원
+- `client-shabu20@example.com` / 샤브20 광고주 / 샤브20만 접근
+- `client-3pay@example.com` / 3분페이 광고주 / 3분페이만 접근
 
 mock 모드에서는 입력한 비밀번호를 검증하지 않고 이메일만 확인합니다. 실제 운영 전에는 Supabase Auth와 RLS 적용이 필요합니다.
 
 ## RLS 적용 필요성
 
-마케터 계정은 클라이언트에서 필터를 숨기는 것만으로는 보호되지 않습니다. Supabase 테이블에 RLS를 활성화하고, `auth.uid()` 기준으로 `pm_marketer_advertisers`에 배정된 광고주 데이터만 조회되도록 정책을 적용해야 합니다.
+마케터/광고주 계정은 클라이언트에서 필터를 숨기는 것만으로는 보호되지 않습니다. Supabase 테이블에 RLS를 활성화하고, `auth.uid()` 기준으로 다음 정책을 적용해야 합니다.
+
+- admin은 전체 `pm_` 데이터 조회/관리 가능
+- marketer는 `pm_marketer_advertisers`에 연결된 광고주만 조회/관리 가능
+- marketer는 본인 담당 광고주의 광고주 계정만 생성/관리 가능
+- advertiser는 `pm_advertiser_users`에 연결된 본인 광고주의 `click_logs`, `blocked_ips`, `reports`만 조회 가능
+- service role key는 서버 API에서만 사용
 
 ## 더미 데이터
 

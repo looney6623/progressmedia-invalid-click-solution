@@ -24,7 +24,7 @@ export default function LoginPage({ onSignIn, loading }) {
           </span>
           <div>
             <p className="text-xs font-semibold text-brand">PROGRESSMEDIA AUTH</p>
-            <h1 className="mt-1 text-xl font-bold text-white">마케터 계정 로그인</h1>
+            <h1 className="mt-1 text-xl font-bold text-white">계정 로그인</h1>
           </div>
         </div>
 
@@ -36,7 +36,7 @@ export default function LoginPage({ onSignIn, loading }) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="mt-1 h-11 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100 outline-none focus:border-brand"
-              placeholder="marketer@progressmedia.co.kr"
+              placeholder="account@progressmedia.co.kr"
             />
           </label>
           <label className="block">
@@ -61,9 +61,11 @@ export default function LoginPage({ onSignIn, loading }) {
 
         <div className="mt-5 rounded-md border border-line bg-panelSoft p-4 text-xs leading-5 text-slate-400">
           <p className="font-semibold text-slate-300">Mock 계정</p>
-          <p>admin@progressmedia.co.kr / 관리자</p>
+          <p>admin@progressmedia.co.kr / 관리자 / 전체 접근</p>
           <p>marketer1@progressmedia.co.kr / 윤인홍 / 샤브20, 3분페이</p>
           <p>marketer2@progressmedia.co.kr / 마케터B / 대주바이오, 바른숨병원</p>
+          <p>client-shabu20@example.com / 샤브20 광고주</p>
+          <p>client-3pay@example.com / 3분페이 광고주</p>
         </div>
       </div>
     </main>
