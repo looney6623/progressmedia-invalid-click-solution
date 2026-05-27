@@ -8,11 +8,13 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
     siteUrl: "",
     contactName: "",
     loginEmail: "",
+    temporaryPassword: "",
     permission: "manage",
     status: "active"
   });
   const [created, setCreated] = useState(null);
   const [copied, setCopied] = useState("");
+  const [error, setError] = useState("");
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -20,18 +22,21 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
 
   async function submit(event) {
     event.preventDefault();
+    setError("");
     const result = await onCreateAdvertiser(form, currentUser);
-    if (result.ok) {
-      setCreated(result);
-      setForm({ name: "", siteUrl: "", contactName: "", loginEmail: "", permission: "manage", status: "active" });
+    if (!result.ok) {
+      setError(result.error || "광고주 생성에 실패했습니다.");
+      return;
     }
+    setCreated(result);
+    setForm({ name: "", siteUrl: "", contactName: "", loginEmail: "", temporaryPassword: "", permission: "manage", status: "active" });
   }
 
   async function copyText(label, value) {
     try {
       await navigator.clipboard.writeText(value);
     } catch {
-      // 클립보드 권한이 없어도 완료 상태는 표시합니다.
+      // Clipboard permission can be unavailable in some browsers.
     }
     setCopied(label);
     window.setTimeout(() => setCopied(""), 1800);
@@ -40,18 +45,23 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
   return (
     <Card id="advertiser-create" className="scroll-mt-24">
       <SectionTitle icon={Building2} title="광고주 생성" />
-      <SectionDescription>마케터가 광고주와 광고주 로그인 계정을 함께 생성합니다. 생성 즉시 client_id, project_key, 설치 스크립트가 발급됩니다.</SectionDescription>
+      <SectionDescription>
+        광고주 정보와 광고주 로그인 계정 발급 정보를 등록합니다. 실제 운영에서는 광고주 Auth 계정 생성이 서버 API Route에서 처리됩니다.
+      </SectionDescription>
+      {error && <div className="mx-5 mt-4 rounded-md border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
       <div className="grid gap-5 p-5 xl:grid-cols-[0.9fr_1.1fr]">
         <form onSubmit={submit} className="space-y-3">
           {[
-            ["name", "광고주명", "예: 샤브20"],
-            ["siteUrl", "사이트 URL", "https://example.com"],
-            ["contactName", "광고주 담당자명", "홍길동"],
-            ["loginEmail", "광고주 로그인 이메일", "client@example.com"]
-          ].map(([key, label, placeholder]) => (
+            ["name", "광고주명", "예: 샤브20", "text"],
+            ["siteUrl", "사이트 URL", "https://example.com", "url"],
+            ["contactName", "광고주 담당자명", "홍길동", "text"],
+            ["loginEmail", "광고주 로그인 이메일", "client@example.com", "email"],
+            ["temporaryPassword", "임시 비밀번호", "임시 비밀번호", "password"]
+          ].map(([key, label, placeholder, type]) => (
             <label key={key} className="block">
               <span className="text-xs font-semibold text-slate-500">{label}</span>
               <input
+                type={type}
                 value={form[key]}
                 onChange={(event) => updateField(key, event.target.value)}
                 required
@@ -92,8 +102,8 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
               <div className="grid gap-2 sm:grid-cols-2">
                 <Info label="client_id" value={created.advertiser.clientId} onCopy={() => copyText("client_id", created.advertiser.clientId)} />
                 <Info label="project_key" value={created.advertiser.projectKey} onCopy={() => copyText("project_key", created.advertiser.projectKey)} />
-                <Info label="광고주 계정" value={created.advertiserUser.email} />
-                <Info label="임시 비밀번호" value={created.advertiserUserLink.temporaryPassword} onCopy={() => copyText("password", created.advertiserUserLink.temporaryPassword)} />
+                <Info label="광고주 계정" value={created.advertiserUser?.email || created.advertiserUserLink?.email || "-"} />
+                <Info label="임시 비밀번호" value={created.advertiserUserLink?.temporaryPassword || "서버에서 별도 발급"} onCopy={() => copyText("password", created.advertiserUserLink?.temporaryPassword || "")} />
               </div>
               <pre className="max-h-44 overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-300">{created.installScript}</pre>
               <button onClick={() => copyText("script", created.installScript)} className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-ink px-3 text-xs font-semibold text-slate-300">

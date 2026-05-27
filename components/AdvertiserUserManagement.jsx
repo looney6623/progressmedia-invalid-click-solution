@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Copy, KeyRound, UserPlus, UsersRound } from "lucide-react";
 import { Card, SectionDescription, SectionTitle, StatusBadge } from "@/components/ui";
 
@@ -9,8 +9,12 @@ export default function AdvertiserUserManagement({
   onUpdatePermission,
   onDeactivateUser
 }) {
-  const [form, setForm] = useState({ advertiserId: advertisers[0]?.id || "", name: "", email: "", permission: "view" });
+  const [form, setForm] = useState({ advertiserId: advertisers[0]?.id || "", name: "", email: "", temporaryPassword: "", permission: "view" });
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    setForm((prev) => ({ ...prev, advertiserId: prev.advertiserId || advertisers[0]?.id || "" }));
+  }, [advertisers]);
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -21,8 +25,10 @@ export default function AdvertiserUserManagement({
     const advertiser = advertisers.find((item) => item.id === form.advertiserId);
     const result = await onCreateUser({ ...form, advertiserName: advertiser?.name });
     if (result.ok) {
-      setNotice(`${form.email} 계정을 생성했습니다.`);
-      setForm({ advertiserId: advertisers[0]?.id || "", name: "", email: "", permission: "view" });
+      setNotice(`${form.email} 계정이 생성되었습니다.`);
+      setForm({ advertiserId: advertisers[0]?.id || "", name: "", email: "", temporaryPassword: "", permission: "view" });
+    } else {
+      setNotice(result.error || "계정 생성에 실패했습니다.");
     }
   }
 
@@ -30,7 +36,7 @@ export default function AdvertiserUserManagement({
     try {
       await navigator.clipboard.writeText(row.inviteLink || "https://app.progressmedia.example/invite/mock");
     } catch {
-      // 클립보드 권한 제한 시에도 안내는 유지합니다.
+      // Clipboard permission can be unavailable in some browsers.
     }
     setNotice(`${row.email} 초대 링크를 복사했습니다.`);
   }
@@ -38,7 +44,9 @@ export default function AdvertiserUserManagement({
   return (
     <Card id="advertiser-users" className="scroll-mt-24">
       <SectionTitle icon={UsersRound} title="광고주 계정 관리" />
-      <SectionDescription>마케터는 본인 담당 광고주의 광고주 로그인 계정을 만들고 권한, 활성 상태, 초대 링크를 관리합니다.</SectionDescription>
+      <SectionDescription>
+        담당 광고주의 로그인 계정을 생성하고 권한, 활성 상태, 초대 링크를 관리합니다. 광고주 계정 생성은 운영 환경에서 서버 API Route를 통해 처리됩니다.
+      </SectionDescription>
       {notice && <div className="mx-5 mt-4 rounded-md border border-brand/25 bg-brand/10 px-4 py-3 text-sm font-semibold text-brand">{notice}</div>}
       <div className="grid gap-5 p-5 xl:grid-cols-[0.75fr_1.25fr]">
         <form onSubmit={submit} className="space-y-3 rounded-md border border-line bg-panelSoft p-4">
@@ -57,6 +65,10 @@ export default function AdvertiserUserManagement({
           <label className="block">
             <span className="text-xs font-semibold text-slate-500">로그인 이메일</span>
             <input type="email" value={form.email} onChange={(event) => updateField("email", event.target.value)} required className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100" />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-500">임시 비밀번호</span>
+            <input type="password" value={form.temporaryPassword} onChange={(event) => updateField("temporaryPassword", event.target.value)} required className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100" />
           </label>
           <label className="block">
             <span className="text-xs font-semibold text-slate-500">권한</span>
@@ -100,7 +112,7 @@ export default function AdvertiserUserManagement({
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
                       <button onClick={() => onDeactivateUser(row.id)} className="rounded border border-line bg-panelSoft px-2 py-1 text-xs text-slate-300">비활성화</button>
-                      <button onClick={() => setNotice(`${row.email} 임시 비밀번호: Temp!2026`)} className="inline-flex items-center gap-1 rounded border border-line bg-panelSoft px-2 py-1 text-xs text-slate-300">
+                      <button onClick={() => setNotice(`${row.email} 임시 비밀번호 재발급은 서버 API 연결 후 처리됩니다.`)} className="inline-flex items-center gap-1 rounded border border-line bg-panelSoft px-2 py-1 text-xs text-slate-300">
                         <KeyRound size={13} />
                         임시 비밀번호
                       </button>

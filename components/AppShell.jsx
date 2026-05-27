@@ -22,13 +22,25 @@ const routeRoles = {
 export default function AppShell({ title, description, actions, children }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { authReady, user, myAdvertisers, loginLoading, handleSignIn, handleSignUp, handleSignOut } = useAppState();
+  const { authReady, authError, user, myAdvertisers, loginLoading, handleSignIn, handleSignUp, handleSignOut } = useAppState();
 
   useEffect(() => {
     if (authReady && user && pathname === "/") router.replace("/dashboard");
   }, [authReady, pathname, router, user]);
 
   if (!authReady) return <div className="min-h-screen bg-ink" />;
+
+  if (authError && !user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-5 py-10 text-slate-200">
+        <Card className="max-w-lg p-6">
+          <p className="text-xs font-semibold text-danger">CONFIGURATION ERROR</p>
+          <h1 className="mt-2 text-xl font-bold text-white">서비스 연결 설정이 필요합니다</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-400">{authError}</p>
+        </Card>
+      </main>
+    );
+  }
 
   if (!user) {
     return <LoginPage onSignIn={handleSignIn} onSignUp={handleSignUp} loading={loginLoading} />;

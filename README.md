@@ -1,169 +1,148 @@
 # 프로그레스미디어 무효클릭차단 솔루션
 
-Next.js 14, React, TailwindCSS, Recharts 기반의 무효클릭차단 관리자 대시보드 데모입니다. 현재 버전은 서버/DB/실제 추적 스크립트와 연결하지 않고 더미 데이터와 mock 인증 상태로 동작합니다.
+Next.js 14, React, TailwindCSS, Recharts 기반의 무효클릭차단 솔루션입니다. 현재 1차 상용화 준비 단계로, 운영 모드와 개발 모드를 분리하고 Supabase Auth/DB 연동을 우선하는 구조로 정리했습니다.
 
-## 실행 방법
+## 실행
 
 ```bash
 npm install
 npm run dev
-```
-
-빌드 확인:
-
-```bash
 npm run build
 ```
 
-## 화면 구조
+## 환경 모드
 
-원페이지 섹션 이동 구조를 Next.js App Router 기반의 개별 페이지 구조로 변경했습니다. 사이드바 메뉴 클릭 시 URL이 실제로 변경됩니다.
+`PM_PROJECT_ENV` 기준으로 동작 모드를 나눕니다.
 
-- `/`: 로그인 화면. 로그인된 사용자는 `/dashboard`로 이동합니다.
-- `/dashboard`: KPI, 클릭 추이, 상태 분포, 광고주/매체별 요약
-- `/advertisers`: 광고주 관리 통합 화면
-- `/logs`: 실시간 클릭 로그
-- `/analysis`: 무효클릭 분석
-- `/blocks`: 차단 관리
-- `/reports`: 광고주 리포트와 CSV 내보내기
-- `/account`: 내 계정과 접근 가능한 광고주 확인
+- `local`, `development`: Supabase 환경변수가 없으면 mock fallback 허용
+- `production`, `cloudtype`: Supabase 연결을 우선 사용하며, 연결 설정이 없으면 mock으로 조용히 넘어가지 않고 설정 오류를 표시
 
-로그인 후 화면은 `AppShell` 공통 레이아웃을 사용합니다. `AppShell`은 `Sidebar`, `PageHeader`, 본문 영역을 공통으로 제공합니다.
+클라이언트에는 `next.config.mjs`를 통해 모드 값만 `NEXT_PUBLIC_PM_PROJECT_ENV`로 주입합니다. service role key, IP salt 같은 민감 정보는 클라이언트에 노출하지 않습니다.
 
-## 메뉴 구조
+## 환경변수
 
-좌측 사이드바는 실서비스 관리자 도구에 맞춰 아래 메뉴로 정리했습니다.
-
-- 대시보드
-- 광고주 관리
-- 실시간 클릭 로그
-- 무효클릭 분석
-- 차단 관리
-- 광고주 리포트
-- 내 계정
-- 로그아웃
-
-활성 메뉴는 브랜드 민트 배경으로 표시되며, hover 상태와 아이콘 정렬을 통일했습니다.
-
-## 광고주 관리 통합
-
-기존에 분리되어 있던 내 광고주, 광고주 생성, 광고주 계정 관리, 설치 스크립트 기능을 `/advertisers` 페이지로 통합했습니다.
-
-광고주 관리 페이지 구성:
-
-- 요약 카드: 내 광고주 수, 활성 광고주 수, 설치 완료 수, 광고주 계정 수
-- 탭 1: 광고주 목록
-- 탭 2: 광고주 생성
-- 탭 3: 광고주 계정 관리
-- 탭 4: 설치 스크립트
-
-광고주 생성과 광고주 계정 관리는 기존 mock fallback 구조를 유지합니다. 광고주 계정은 광고주 담당자 이메일을 사용할 수 있으며 `pm_advertiser_users`를 통해 특정 광고주와 연결되는 구조입니다.
-
-## role별 메뉴 접근
-
-- `admin`: 전체 메뉴 접근 가능
-- `marketer`: 대시보드, 광고주 관리, 실시간 클릭 로그, 무효클릭 분석, 차단 관리, 광고주 리포트, 내 계정 접근 가능
-- `advertiser`: 대시보드, 실시간 클릭 로그, 차단 관리, 광고주 리포트, 내 계정 접근 가능
-
-광고주 role은 `/advertisers`와 `/analysis`에 접근할 수 없습니다. 직접 URL로 접근하면 권한 없음 화면이 표시됩니다.
-
-## 데이터 접근 범위
-
-기존 role별 광고주 필터링은 유지됩니다.
-
-- `admin`: 전체 광고주 데이터 접근
-- `marketer`: 본인이 생성했거나 배정받은 광고주만 접근
-- `advertiser`: 본인 광고주만 접근
-
-이 접근 범위는 KPI, 차트, 로그, 차단 관리, 리포트, 광고주 관리 화면에 동일하게 반영됩니다.
-
-## 계정 구조
-
-- 관리자: 서버 운영자가 Supabase Auth/DB에서 직접 생성하는 마스터 계정입니다. 일반 로그인 화면에서 생성할 수 없습니다.
-- 마케터: 내부 직원이 로그인 화면에서 직접 계정을 생성할 수 있습니다. 회사 내부 마케터 계정 도메인은 `@my-progress.co.kr` 기준이며, 회원가입 시 role은 항상 `marketer`로 저장됩니다.
-- 광고주: 마케터가 대시보드 내부의 광고주 생성/광고주 계정 관리 화면에서 발급합니다. 광고주 담당자 이메일을 사용할 수 있으며 role은 `advertiser`로 저장됩니다.
-
-## Supabase Auth 설정
-
-현재는 Supabase 환경변수가 없으면 mock 로그인으로 동작합니다. 실제 계정 연동 시 배포 환경에 아래 값을 등록합니다.
+`.env.example`을 기준으로 Cloudtype 또는 로컬 환경변수를 등록합니다.
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_APP_URL=
+NEXT_PUBLIC_TRACKER_URL=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+PM_PROJECT_ENV=local
+LOG_RETENTION_DAYS=90
+IP_HASH_SALT=change-me
 ```
 
 주의:
 
-- `SUPABASE_SERVICE_ROLE_KEY`는 클라이언트에 절대 노출하지 않습니다.
-- service role key는 서버 API, Supabase Edge Function, 배치 작업에서만 사용합니다.
-- 브라우저에서는 anon key와 RLS 정책으로 접근 범위를 제한합니다.
+- `SUPABASE_SERVICE_ROLE_KEY`는 서버 API Route에서만 사용합니다.
+- `IP_HASH_SALT`는 서버에서 IP hash 생성에만 사용합니다.
+- 두 값에는 절대 `NEXT_PUBLIC_` 접두어를 붙이지 않습니다.
 
-## Mock 로그인 fallback
+## Supabase 연결 순서
 
-Supabase 환경변수가 없을 때 개발 확인용으로 사용할 수 있는 예시 계정입니다. 로그인 화면에는 mock 계정 목록을 노출하지 않습니다.
+1. Supabase Auth 활성화
+2. `docs/AUTH_RLS_SCHEMA.sql` 기준으로 `pm_profiles`, `pm_advertisers`, `pm_marketer_advertisers`, `pm_advertiser_users` 등 테이블 생성
+3. RLS 정책 적용
+4. Cloudtype 환경변수 등록
+5. `PM_PROJECT_ENV=cloudtype` 설정
+6. 마케터 회원가입 및 로그인 테스트
+7. 광고주 생성, 광고주 계정 생성, 설치 스크립트 발급 테스트
 
-- `admin@my-progress.co.kr` / 개발·마스터 테스트용
-- `yxxn98@my-progress.co.kr` / 마케터 예시 / 샤브20, 3분페이 관리
-- `marketer2@my-progress.co.kr` / 마케터B 예시 / 대주바이오, 바른숨병원 관리
-- `client-shabu20@example.com` / 광고주 예시 / 샤브20만 접근
-- `client-3pay@example.com` / 광고주 예시 / 3분페이만 접근
+## 계정 생성 흐름
 
-mock 모드에서는 비밀번호를 검증하지 않고 이메일만 확인합니다. 실제 운영 전에는 Supabase Auth와 RLS 적용이 필요합니다.
+- 관리자: 일반 화면에서 생성하지 않습니다. 서버 운영자가 Supabase Auth/DB에서 직접 생성하는 마스터 계정입니다.
+- 마케터: 로그인 화면에서 직접 가입합니다. `@my-progress.co.kr` 이메일만 허용하며 role은 항상 `marketer`로 저장됩니다.
+- 광고주: 로그인 화면에서 직접 가입할 수 없습니다. 마케터가 `/advertisers`의 광고주 관리 화면에서 발급합니다.
 
-## 주요 파일 구조
+신규 마케터는 담당 광고주가 0개여도 대시보드에 접근할 수 있으며, `광고주 생성하기` 버튼을 통해 광고주를 등록할 수 있습니다. 광고주 role만 연결된 광고주가 없을 때 접근 불가 안내를 표시합니다.
 
-```text
-app/
-  page.jsx
-  dashboard/page.jsx
-  advertisers/page.jsx
-  logs/page.jsx
-  analysis/page.jsx
-  blocks/page.jsx
-  reports/page.jsx
-  account/page.jsx
-components/
-  AppStateProvider.jsx
-  AppShell.jsx
-  PageHeader.jsx
-  Sidebar.jsx
-  LoginPage.jsx
-  AdvertisersWorkspace.jsx
-  FilterBar.jsx
-  KpiCards.jsx
-  ClickTrendChart.jsx
-  ClickStatusChart.jsx
-  AdvertiserChart.jsx
-  MediaChart.jsx
-  ClickLogTable.jsx
-  BlockManagement.jsx
-  InstallScriptPanel.jsx
-  AdvertiserReport.jsx
-  AdvertiserCreatePanel.jsx
-  AdvertiserUserManagement.jsx
-docs/
-  API_SPEC.md
-  DB_SCHEMA.md
-  TRACKING_SCRIPT_SPEC.md
-  BLOCKING_POLICY.md
-  PRIVACY_LOG_POLICY.md
-  DEPLOYMENT_PLAN.md
-  AUTH_RLS_SCHEMA.sql
-lib/
-  clickData.js
-  detectInvalidClick.js
-  filterClicks.js
-  exportCsv.js
-  format.js
-  supabaseClient.js
-services/
-  clickService.js
+## 광고주 관리
+
+`/advertisers` 페이지는 아래 탭을 통합합니다.
+
+- 광고주 목록
+- 광고주 생성
+- 광고주 계정 관리
+- 설치 스크립트
+
+광고주 생성 필수값:
+
+- 광고주명
+- 사이트 URL
+- 광고주 담당자명
+- 광고주 로그인 이메일
+- 임시 비밀번호
+
+생성 시 `client_id`, `project_key`를 자동 발급하고 `pm_advertisers`, `pm_marketer_advertisers` 저장 구조를 사용합니다. 광고주 Auth 계정 생성처럼 service role key가 필요한 작업은 클라이언트가 아니라 API Route에서 처리합니다.
+
+## API Route
+
+상용화를 위한 서버 API 뼈대를 추가했습니다.
+
+- `POST /api/advertisers`: 광고주 생성, 마케터 연결, 설치 스크립트 발급 준비
+- `POST /api/advertiser-users`: 광고주 Auth 계정 생성과 `pm_advertiser_users` 연결 준비
+- `POST /api/collect`: 추적 스크립트 클릭/방문 수집 준비
+- `POST /api/events`: 체류시간, 전환 이벤트 수집 준비
+
+운영 모드에서 `SUPABASE_SERVICE_ROLE_KEY`가 없으면 service role이 필요한 API는 503 오류를 반환합니다.
+
+## 추적 스크립트
+
+`public/pm-click-shield.js`는 설치 태그의 `data-client-id`, `data-project-key`를 읽습니다.
+
+예시:
+
+```html
+<script src="https://your-app.example.com/pm-click-shield.js" data-client-id="pm-client" data-project-key="pk-project" async></script>
 ```
 
-## 향후 서버 연동 계획
+동작:
 
-- `services/clickService.js`의 mock 반환 함수를 fetch API 호출로 교체
-- 클릭 로그, 차단 IP, 설치 상태, 리포트를 Supabase/PostgreSQL에서 조회
-- 수동 차단 추가/해제를 POST/DELETE API와 연결
-- 광고주 Auth 계정 생성은 service role key를 사용하는 서버 API로 분리
-- 추적 스크립트 수집 API와 판정/차단 정책을 서버에서 실행
+- `/api/collect`로 방문/클릭 수집 POST
+- `/api/events`로 체류시간 이벤트 POST
+- `localStorage`에 visitor id 생성
+- session id는 페이지 세션 단위로 생성
+
+## 개인정보/로그 정책
+
+- IP 원문 저장을 최소화합니다.
+- API Route는 `ip_hash`, `ip_masked` 필드 기준으로 저장하도록 설계했습니다.
+- `IP_HASH_SALT`는 서버 환경변수로만 사용합니다.
+- 기본 로그 보관기간은 `LOG_RETENTION_DAYS=90` 기준입니다.
+- 광고주별 데이터는 RLS와 `advertiser_id` 기준으로 분리해야 합니다.
+
+## 화면 라우트
+
+- `/`: 로그인
+- `/dashboard`: 대시보드
+- `/advertisers`: 광고주 관리
+- `/logs`: 실시간 클릭 로그
+- `/analysis`: 무효클릭 분석
+- `/blocks`: 차단 관리
+- `/reports`: 광고주 리포트
+- `/account`: 내 계정
+
+## 주요 파일
+
+```text
+app/api/advertisers/route.js
+app/api/advertiser-users/route.js
+app/api/collect/route.js
+app/api/events/route.js
+public/pm-click-shield.js
+lib/envMode.js
+lib/supabaseClient.js
+lib/serverSupabase.js
+lib/privacy.js
+services/clickService.js
+components/AdvertiserCreatePanel.jsx
+components/AdvertiserUserManagement.jsx
+```
+
+## 보안 메모
+
+- 실제 Supabase 키는 코드에 넣지 않습니다.
+- service role key는 클라이언트 컴포넌트와 클라이언트 서비스에서 사용하지 않습니다.
+- 운영 모드에서 Supabase 설정 오류가 있으면 mock fallback으로 숨기지 않고 명확한 오류를 표시합니다.

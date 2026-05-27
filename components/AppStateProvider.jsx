@@ -38,6 +38,7 @@ const initialFilters = {
 
 export function AppStateProvider({ children }) {
   const [authReady, setAuthReady] = useState(false);
+  const [authError, setAuthError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [user, setUser] = useState(null);
   const [myAdvertisers, setMyAdvertisers] = useState([]);
@@ -74,11 +75,17 @@ export function AppStateProvider({ children }) {
 
   useEffect(() => {
     let active = true;
-    fetchCurrentUser().then(async (currentUser) => {
-      if (!active) return;
-      await loadAuthContext(currentUser);
-      setAuthReady(true);
-    });
+    fetchCurrentUser()
+      .then(async (currentUser) => {
+        if (!active) return;
+        await loadAuthContext(currentUser);
+      })
+      .catch((error) => {
+        if (active) setAuthError(error.message || "인증 상태를 확인하지 못했습니다.");
+      })
+      .finally(() => {
+        if (active) setAuthReady(true);
+      });
     return () => {
       active = false;
     };
@@ -175,6 +182,7 @@ export function AppStateProvider({ children }) {
 
   const value = {
     authReady,
+    authError,
     loginLoading,
     user,
     myAdvertisers,

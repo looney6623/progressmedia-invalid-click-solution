@@ -6,7 +6,7 @@ import {
   getMediaStats,
   summarizeClicks
 } from "@/lib/clickData";
-import { createSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabaseClient";
+import { canUseMockFallback, createSupabaseBrowserClient, getSupabaseConfigError, hasSupabaseConfig } from "@/lib/supabaseClient";
 
 const MOCK_SESSION_KEY = "pm_mock_user_email";
 const MOCK_USERS_KEY = "pm_mock_users";
@@ -47,7 +47,7 @@ let mockAdvertiserUsers = [
   { id: "adu_002", userId: "user_client_3pay", advertiserId: "adv_002", permission: "view", createdBy: "user_marketer_1", isActive: true, inviteLink: "https://app.progressmedia.example/invite/adu_002", temporaryPassword: "Temp!2026" }
 ];
 
-function browserStorage() {
+function browserSessionStorage() {
   if (typeof window === "undefined") return null;
   return window.sessionStorage;
 }
@@ -57,7 +57,18 @@ function browserLocalStorage() {
   return window.localStorage;
 }
 
+function serviceUnavailable() {
+  return { ok: false, error: getSupabaseConfigError() };
+}
+
+function ensureServiceMode() {
+  if (hasSupabaseConfig()) return "supabase";
+  if (canUseMockFallback()) return "mock";
+  return "unavailable";
+}
+
 function hydrateMockUsers() {
+  if (!canUseMockFallback()) return;
   const stored = browserLocalStorage()?.getItem(MOCK_USERS_KEY);
   if (!stored) return;
   try {
@@ -66,11 +77,12 @@ function hydrateMockUsers() {
     const existingEmails = new Set(mockUsers.map((user) => user.email.toLowerCase()));
     mockUsers = [...mockUsers, ...users.filter((user) => user?.email && !existingEmails.has(user.email.toLowerCase()))];
   } catch {
-    // Ignore malformed development-only mock storage.
+    // Development-only storage may be cleared or malformed.
   }
 }
 
 function persistMockUser(user) {
+  if (!canUseMockFallback()) return;
   const storage = browserLocalStorage();
   if (!storage) return;
   let users = [];
@@ -79,8 +91,7 @@ function persistMockUser(user) {
   } catch {
     users = [];
   }
-  const nextUsers = [user, ...users.filter((item) => item.email?.toLowerCase() !== user.email.toLowerCase())];
-  storage.setItem(MOCK_USERS_KEY, JSON.stringify(nextUsers));
+  storage.setItem(MOCK_USERS_KEY, JSON.stringify([user, ...users.filter((item) => item.email?.toLowerCase() !== user.email.toLowerCase())]));
 }
 
 function slugify(value) {
@@ -91,19 +102,12 @@ function slugify(value) {
     .slice(0, 24) || "advertiser";
 }
 
-export function generateProjectKey(name = "advertiser") {
-  return `pk_${slugify(name)}_${String(advertiserSequence).padStart(3, "0")}`;
+function normalizeEmail(email) {
+  return email.trim().toLowerCase();
 }
 
-export function generateInstallScript(clientId, projectKey) {
-  return `<script>
-(function(w,d,s,u,c,p){
-  w.pmInvalidClick=w.pmInvalidClick||function(){(w.pmInvalidClick.q=w.pmInvalidClick.q||[]).push(arguments)};
-  w.pmInvalidClick("init",{clientId:c,projectKey:p});
-  var js=d.createElement(s); js.async=true; js.src=u;
-  d.head.appendChild(js);
-})(window,document,"script","https://cdn.progressmedia.co.kr/invalid-click.js","${clientId}","${projectKey}");
-</script>`;
+function isAllowedCompanyEmail(email) {
+  return COMPANY_EMAIL_PATTERN.test(email.trim());
 }
 
 function mapSupabaseProfile(profile) {
@@ -155,43 +159,70 @@ function advertiserFromDb(item) {
   };
 }
 
+async function apiPost(path, payload) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) return { ok: false, error: body.error || "요청 처리에 실패했습니다." };
+  return body;
+}
+
 export function isSupabaseAuthEnabled() {
   return hasSupabaseConfig();
 }
 
-function isAllowedCompanyEmail(email) {
-  return COMPANY_EMAIL_PATTERN.test(email.trim());
+export function generateProjectKey(name = "advertiser") {
+  const randomPart = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : String(advertiserSequence).padStart(3, "0");
+  return `pk_${slugify(name)}_${randomPart}`;
+}
+
+export function generateInstallScript(clientId, projectKey) {
+  const trackerUrl = process.env.NEXT_PUBLIC_TRACKER_URL || "/pm-click-shield.js";
+  return `<script src="${trackerUrl}" data-client-id="${clientId}" data-project-key="${projectKey}" async></script>`;
 }
 
 export async function fetchCurrentUser() {
-  if (hasSupabaseConfig()) {
+  const mode = ensureServiceMode();
+  if (mode === "unavailable") throw new Error(getSupabaseConfigError());
+
+  if (mode === "supabase") {
     const supabase = createSupabaseBrowserClient();
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw new Error(sessionError.message);
     const authUser = sessionData.session?.user;
     if (!authUser) return null;
 
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
       .from("pm_profiles")
       .select("id,email,name,role,team,is_active")
       .eq("id", authUser.id)
       .maybeSingle();
 
+    if (error) throw new Error(error.message);
     const mappedProfile = mapSupabaseProfile(profile);
     if (mappedProfile) return mappedProfile;
 
     const fallbackProfile = profileFromAuthUser(authUser);
-    await supabase.from("pm_profiles").upsert(profileToDb(fallbackProfile));
+    if (fallbackProfile.role === "marketer") {
+      await supabase.from("pm_profiles").upsert(profileToDb(fallbackProfile));
+    }
     return fallbackProfile;
   }
 
   hydrateMockUsers();
-  const storedEmail = browserStorage()?.getItem(MOCK_SESSION_KEY);
+  const storedEmail = browserSessionStorage()?.getItem(MOCK_SESSION_KEY);
   return mockUsers.find((user) => user.email === storedEmail && user.isActive) || null;
 }
 
 export async function signInWithEmail(email, password) {
-  const normalizedEmail = email.trim().toLowerCase();
-  if (hasSupabaseConfig()) {
+  const normalizedEmail = normalizeEmail(email);
+  const mode = ensureServiceMode();
+  if (mode === "unavailable") return serviceUnavailable();
+
+  if (mode === "supabase") {
     const supabase = createSupabaseBrowserClient();
     const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error) return { ok: false, error: error.message };
@@ -200,53 +231,38 @@ export async function signInWithEmail(email, password) {
 
   hydrateMockUsers();
   const user = mockUsers.find((item) => item.email.toLowerCase() === normalizedEmail && item.isActive);
-  if (!user) return { ok: false, error: "등록되지 않았거나 비활성화된 mock 계정입니다." };
-  browserStorage()?.setItem(MOCK_SESSION_KEY, user.email);
+  if (!user) return { ok: false, error: "등록되지 않았거나 비활성화된 계정입니다." };
+  browserSessionStorage()?.setItem(MOCK_SESSION_KEY, user.email);
   return { ok: true, user };
 }
 
 export async function signUpMarketerAccount({ name, email, password, team }) {
-  const normalizedEmail = email.trim().toLowerCase();
-  if (!isAllowedCompanyEmail(normalizedEmail)) {
-    return { ok: false, error: COMPANY_EMAIL_ERROR };
-  }
+  const normalizedEmail = normalizeEmail(email);
+  if (!isAllowedCompanyEmail(normalizedEmail)) return { ok: false, error: COMPANY_EMAIL_ERROR };
 
-  if (hasSupabaseConfig()) {
+  const mode = ensureServiceMode();
+  if (mode === "unavailable") return serviceUnavailable();
+
+  if (mode === "supabase") {
     const supabase = createSupabaseBrowserClient();
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
-      options: {
-        data: {
-          name,
-          role: "marketer",
-          team
-        }
-      }
+      options: { data: { name, role: "marketer", team } }
     });
-
     if (error) return { ok: false, error: error.message };
 
     if (data.user) {
-      const profile = {
-        id: data.user.id,
-        email: normalizedEmail,
-        name,
-        role: "marketer",
-        team,
-        is_active: true
-      };
+      const profile = { id: data.user.id, email: normalizedEmail, name, role: "marketer", team, is_active: true };
       await supabase.from("pm_profiles").upsert(profile);
       return { ok: true, user: mapSupabaseProfile(profile) };
     }
-
     return { ok: true, user: await fetchCurrentUser() };
   }
 
   hydrateMockUsers();
   const exists = mockUsers.some((user) => user.email.toLowerCase() === normalizedEmail);
   if (exists) return { ok: false, error: "이미 등록된 이메일입니다." };
-
   const user = {
     id: `user_marketer_mock_${String(marketerSequence++).padStart(3, "0")}`,
     email: normalizedEmail,
@@ -255,44 +271,45 @@ export async function signUpMarketerAccount({ name, email, password, team }) {
     team,
     isActive: true
   };
-
   mockUsers = [user, ...mockUsers];
   persistMockUser(user);
-  browserStorage()?.setItem(MOCK_SESSION_KEY, user.email);
+  browserSessionStorage()?.setItem(MOCK_SESSION_KEY, user.email);
   return { ok: true, user };
 }
 
 export async function signOut() {
-  if (hasSupabaseConfig()) {
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
-    return { ok: true };
-  }
-  browserStorage()?.removeItem(MOCK_SESSION_KEY);
+  const mode = ensureServiceMode();
+  if (mode === "supabase") await createSupabaseBrowserClient().auth.signOut();
+  if (mode === "mock") browserSessionStorage()?.removeItem(MOCK_SESSION_KEY);
   return { ok: true };
 }
 
 export async function fetchMyAccessibleAdvertisers(user) {
   if (!user) return { items: [] };
+  const mode = ensureServiceMode();
+  if (mode === "unavailable") return { items: [] };
 
-  if (hasSupabaseConfig()) {
+  if (mode === "supabase") {
     const supabase = createSupabaseBrowserClient();
     if (user.role === "admin") {
-      const { data } = await supabase.from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,created_by").order("name");
+      const { data, error } = await supabase.from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,created_by").order("name");
+      if (error) throw new Error(error.message);
       return { items: (data || []).map(advertiserFromDb) };
     }
     if (user.role === "marketer") {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("pm_marketer_advertisers")
         .select("advertiser:pm_advertisers(id,name,client_id,project_key,site_url,status,created_by),permission")
         .eq("marketer_id", user.id);
-      return { items: (data || []).map((item) => ({ ...advertiserFromDb(item.advertiser), permission: item.permission })) };
+      if (error) throw new Error(error.message);
+      return { items: (data || []).filter((item) => item.advertiser).map((item) => ({ ...advertiserFromDb(item.advertiser), permission: item.permission })) };
     }
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("pm_advertiser_users")
       .select("advertiser:pm_advertisers(id,name,client_id,project_key,site_url,status,created_by),permission")
       .eq("user_id", user.id);
-    return { items: (data || []).map((item) => ({ ...advertiserFromDb(item.advertiser), permission: item.permission })) };
+    if (error) throw new Error(error.message);
+    return { items: (data || []).filter((item) => item.advertiser).map((item) => ({ ...advertiserFromDb(item.advertiser), permission: item.permission })) };
   }
 
   if (user.role === "admin") return { items: mockAdvertisers };
@@ -307,38 +324,35 @@ export async function fetchMyAccessibleAdvertisers(user) {
 export const fetchMyAdvertisers = fetchMyAccessibleAdvertisers;
 
 export async function fetchTeamMembers() {
-  if (hasSupabaseConfig()) {
-    const supabase = createSupabaseBrowserClient();
-    const { data } = await supabase.from("pm_profiles").select("id,email,name,role,team,is_active").order("name");
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const { data, error } = await createSupabaseBrowserClient().from("pm_profiles").select("id,email,name,role,team,is_active").order("name");
+    if (error) throw new Error(error.message);
     return { items: (data || []).map(mapSupabaseProfile) };
   }
-  hydrateMockUsers();
-  return { items: mockUsers };
+  if (mode === "mock") {
+    hydrateMockUsers();
+    return { items: mockUsers };
+  }
+  return { items: [] };
 }
 
 export async function fetchAdvertiserAssignments() {
-  if (hasSupabaseConfig()) {
-    const supabase = createSupabaseBrowserClient();
-    const { data } = await supabase
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const { data, error } = await createSupabaseBrowserClient()
       .from("pm_marketer_advertisers")
       .select("id,marketer_id,advertiser_id,permission,assigned_at");
-    return {
-      items: (data || []).map((item) => ({
-        id: item.id,
-        marketerId: item.marketer_id,
-        advertiserId: item.advertiser_id,
-        permission: item.permission,
-        assignedAt: item.assigned_at
-      }))
-    };
+    if (error) throw new Error(error.message);
+    return { items: (data || []).map((item) => ({ id: item.id, marketerId: item.marketer_id, advertiserId: item.advertiser_id, permission: item.permission, assignedAt: item.assigned_at })) };
   }
-  return { items: mockAssignments };
+  return { items: mode === "mock" ? mockAssignments : [] };
 }
 
 export async function assignAdvertiserToMarketer(marketerId, advertiserId, permission = "manage") {
-  if (hasSupabaseConfig()) {
-    const supabase = createSupabaseBrowserClient();
-    const { data, error } = await supabase
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const { data, error } = await createSupabaseBrowserClient()
       .from("pm_marketer_advertisers")
       .insert({ marketer_id: marketerId, advertiser_id: advertiserId, permission })
       .select("id,marketer_id,advertiser_id,permission,assigned_at")
@@ -346,29 +360,33 @@ export async function assignAdvertiserToMarketer(marketerId, advertiserId, permi
     if (error) return { ok: false, error: error.message };
     return { ok: true, assignment: data };
   }
-  const assignment = {
-    id: `asg_mock_${assignmentSequence++}`,
-    marketerId,
-    advertiserId,
-    permission,
-    assignedAt: "2026-05-27 09:00"
-  };
+  if (mode === "unavailable") return serviceUnavailable();
+  const assignment = { id: `asg_mock_${assignmentSequence++}`, marketerId, advertiserId, permission, assignedAt: "2026-05-27 09:00" };
   mockAssignments = [assignment, ...mockAssignments.filter((item) => !(item.marketerId === marketerId && item.advertiserId === advertiserId))];
   return { ok: true, assignment };
 }
 
 export async function removeAdvertiserAssignment(assignmentId) {
-  if (hasSupabaseConfig()) {
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.from("pm_marketer_advertisers").delete().eq("id", assignmentId);
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const { error } = await createSupabaseBrowserClient().from("pm_marketer_advertisers").delete().eq("id", assignmentId);
     if (error) return { ok: false, error: error.message };
     return { ok: true };
   }
-  mockAssignments = mockAssignments.filter((item) => item.id !== assignmentId);
-  return { ok: true };
+  if (mode === "mock") {
+    mockAssignments = mockAssignments.filter((item) => item.id !== assignmentId);
+    return { ok: true };
+  }
+  return serviceUnavailable();
 }
 
 export async function createAdvertiserWithAccount(payload, currentUser) {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    return apiPost("/api/advertisers", { ...payload, marketerId: currentUser.id });
+  }
+  if (mode === "unavailable") return serviceUnavailable();
+
   const clientId = `pm-${slugify(payload.name)}-${String(advertiserSequence).padStart(3, "0")}`;
   const projectKey = generateProjectKey(payload.name);
   const advertiserId = `adv_${String(advertiserSequence).padStart(3, "0")}`;
@@ -376,30 +394,8 @@ export async function createAdvertiserWithAccount(payload, currentUser) {
   const advertiserUserLinkId = `adu_${String(advertiserUserSequence++).padStart(3, "0")}`;
   advertiserSequence += 1;
 
-  if (hasSupabaseConfig()) {
-    return {
-      ok: false,
-      error: "실제 Supabase 사용자 생성은 service role key가 필요한 서버 API에서 처리해야 합니다."
-    };
-  }
-
-  const advertiser = {
-    id: advertiserId,
-    name: payload.name,
-    clientId,
-    projectKey,
-    siteUrl: payload.siteUrl,
-    status: payload.status,
-    createdBy: currentUser.id
-  };
-  const advertiserUser = {
-    id: advertiserUserId,
-    email: payload.loginEmail,
-    name: payload.contactName,
-    role: "advertiser",
-    team: payload.name,
-    isActive: payload.status === "active"
-  };
+  const advertiser = { id: advertiserId, name: payload.name, clientId, projectKey, siteUrl: payload.siteUrl, status: payload.status, createdBy: currentUser.id };
+  const advertiserUser = { id: advertiserUserId, email: payload.loginEmail, name: payload.contactName, role: "advertiser", team: payload.name, isActive: payload.status === "active" };
   const advertiserUserLink = {
     id: advertiserUserLinkId,
     userId: advertiserUserId,
@@ -408,39 +404,27 @@ export async function createAdvertiserWithAccount(payload, currentUser) {
     createdBy: currentUser.id,
     isActive: true,
     inviteLink: `https://app.progressmedia.example/invite/${advertiserUserLinkId}`,
-    temporaryPassword: "Temp!2026"
+    temporaryPassword: payload.temporaryPassword || "Temp!2026"
   };
-  const assignment = {
-    id: `asg_mock_${assignmentSequence++}`,
-    marketerId: currentUser.id,
-    advertiserId,
-    permission: "manage",
-    assignedAt: "2026-05-27 09:00"
-  };
+  const assignment = { id: `asg_mock_${assignmentSequence++}`, marketerId: currentUser.id, advertiserId, permission: "manage", assignedAt: "2026-05-27 09:00" };
 
   mockAdvertisers = [advertiser, ...mockAdvertisers];
   mockUsers = [advertiserUser, ...mockUsers];
   mockAdvertiserUsers = [advertiserUserLink, ...mockAdvertiserUsers];
   mockAssignments = [assignment, ...mockAssignments];
 
-  return {
-    ok: true,
-    advertiser,
-    advertiserUser,
-    advertiserUserLink,
-    assignment,
-    installScript: generateInstallScript(clientId, projectKey)
-  };
+  return { ok: true, advertiser, advertiserUser, advertiserUserLink, assignment, installScript: generateInstallScript(clientId, projectKey) };
 }
 
 export async function fetchAdvertiserUsers(user) {
   if (!user) return { items: [] };
-  if (hasSupabaseConfig()) {
-    const supabase = createSupabaseBrowserClient();
-    const { data } = await supabase
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const { data, error } = await createSupabaseBrowserClient()
       .from("pm_advertiser_users")
-      .select("id,user_id,advertiser_id,permission,created_by,created_at,profile:pm_profiles(id,email,name,is_active)")
+      .select("id,user_id,advertiser_id,permission,created_by,created_at,profile:pm_profiles(id,email,name,is_active),advertiser:pm_advertisers(name)")
       .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
     return {
       items: (data || []).map((item) => ({
         id: item.id,
@@ -450,10 +434,12 @@ export async function fetchAdvertiserUsers(user) {
         createdBy: item.created_by,
         email: item.profile?.email,
         name: item.profile?.name,
+        advertiserName: item.advertiser?.name,
         isActive: item.profile?.is_active !== false
       }))
     };
   }
+  if (mode !== "mock") return { items: [] };
 
   const accessible = await fetchMyAccessibleAdvertisers(user);
   const advertiserIds = accessible.items.map((item) => item.id);
@@ -468,22 +454,13 @@ export async function fetchAdvertiserUsers(user) {
 }
 
 export async function createAdvertiserUser(payload, currentUser) {
-  if (hasSupabaseConfig()) {
-    return {
-      ok: false,
-      error: "실제 광고주 Auth 계정 생성은 service role key가 필요한 서버 API에서 처리해야 합니다."
-    };
-  }
+  const mode = ensureServiceMode();
+  if (mode === "supabase") return apiPost("/api/advertiser-users", { ...payload, createdBy: currentUser.id });
+  if (mode === "unavailable") return serviceUnavailable();
+
   const id = `adu_${String(advertiserUserSequence++).padStart(3, "0")}`;
   const userId = `user_client_${id}`;
-  const profile = {
-    id: userId,
-    email: payload.email,
-    name: payload.name,
-    role: "advertiser",
-    team: payload.advertiserName || "광고주",
-    isActive: true
-  };
+  const profile = { id: userId, email: payload.email, name: payload.name, role: "advertiser", team: payload.advertiserName || "광고주", isActive: true };
   const row = {
     id,
     userId,
@@ -492,7 +469,7 @@ export async function createAdvertiserUser(payload, currentUser) {
     createdBy: currentUser.id,
     isActive: true,
     inviteLink: `https://app.progressmedia.example/invite/${id}`,
-    temporaryPassword: "Temp!2026"
+    temporaryPassword: payload.temporaryPassword || "Temp!2026"
   };
   mockUsers = [profile, ...mockUsers];
   mockAdvertiserUsers = [row, ...mockAdvertiserUsers];
@@ -500,16 +477,26 @@ export async function createAdvertiserUser(payload, currentUser) {
 }
 
 export async function updateAdvertiserUserPermission(advertiserUserId, permission) {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const { error } = await createSupabaseBrowserClient().from("pm_advertiser_users").update({ permission }).eq("id", advertiserUserId);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  }
   mockAdvertiserUsers = mockAdvertiserUsers.map((item) => item.id === advertiserUserId ? { ...item, permission } : item);
   return { ok: true };
 }
 
 export async function deactivateAdvertiserUser(advertiserUserId) {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const { error } = await createSupabaseBrowserClient().from("pm_advertiser_users").update({ is_active: false }).eq("id", advertiserUserId);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  }
   const target = mockAdvertiserUsers.find((item) => item.id === advertiserUserId);
   mockAdvertiserUsers = mockAdvertiserUsers.map((item) => item.id === advertiserUserId ? { ...item, isActive: false } : item);
-  if (target) {
-    mockUsers = mockUsers.map((user) => user.id === target.userId ? { ...user, isActive: false } : user);
-  }
+  if (target) mockUsers = mockUsers.map((user) => user.id === target.userId ? { ...user, isActive: false } : user);
   return { ok: true };
 }
 
@@ -518,21 +505,11 @@ export async function fetchClickLogs(filters = {}) {
 }
 
 export async function fetchClickDashboard(logs = clickLogs) {
-  return {
-    summary: summarizeClicks(logs),
-    advertiserStats: getAdvertiserStats(logs),
-    mediaStats: getMediaStats(logs),
-    hourlyTrend: getHourlyTrend(logs)
-  };
+  return { summary: summarizeClicks(logs), advertiserStats: getAdvertiserStats(logs), mediaStats: getMediaStats(logs), hourlyTrend: getHourlyTrend(logs) };
 }
 
 export async function fetchAdvertiserReports(logs = clickLogs) {
-  return {
-    summary: summarizeClicks(logs),
-    advertisers: getAdvertiserStats(logs),
-    media: getMediaStats(logs),
-    hourly: getHourlyTrend(logs)
-  };
+  return { summary: summarizeClicks(logs), advertisers: getAdvertiserStats(logs), media: getMediaStats(logs), hourly: getHourlyTrend(logs) };
 }
 
 export async function fetchBlockRules() {
@@ -540,15 +517,7 @@ export async function fetchBlockRules() {
 }
 
 export async function createManualBlock(payload) {
-  return {
-    ok: true,
-    block: {
-      id: "mock-block-001",
-      method: "manual",
-      createdAt: "2026-05-27 14:30",
-      ...payload
-    }
-  };
+  return { ok: true, block: { id: "mock-block-001", method: "manual", createdAt: "2026-05-27 14:30", ...payload } };
 }
 
 export async function removeBlock(blockId) {
@@ -556,12 +525,17 @@ export async function removeBlock(blockId) {
 }
 
 export async function fetchAdvertisers() {
-  return { items: mockAdvertisers };
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const { data, error } = await createSupabaseBrowserClient().from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,created_by").order("name");
+    if (error) throw new Error(error.message);
+    return { items: (data || []).map(advertiserFromDb) };
+  }
+  return { items: mode === "mock" ? mockAdvertisers : [] };
 }
 
 export async function createAdvertiser(payload) {
-  const id = "adv_mock_001";
-  return { ok: true, advertiser: { id, clientId: `pm-${id}`, status: "active", ...payload } };
+  return createAdvertiserWithAccount(payload, { id: payload.createdBy || "user_mock" });
 }
 
 export async function fetchInstallScript(advertiserId) {
