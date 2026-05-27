@@ -22,7 +22,7 @@ export default function BlockManagement({ manualBlocks, blockedLogs, onAddBlock,
         if (manualBlocks.some((item) => item.ip === log.ip)) return acc;
         acc[log.ip] ||= {
           ip: log.ip,
-          startedAt: log.createdAt.toLocaleString("ko-KR"),
+          startedAt: log.dateTime,
           reason: log.reason,
           method: "자동 차단"
         };
@@ -37,13 +37,13 @@ export default function BlockManagement({ manualBlocks, blockedLogs, onAddBlock,
     const trimmedIp = ip.trim();
     const trimmedReason = reason.trim();
     if (!trimmedIp || !trimmedReason) return;
-    onAddBlock({ ip: trimmedIp, reason: trimmedReason, createdAt: new Date().toLocaleString("ko-KR"), method: "수동 차단" });
+    onAddBlock({ ip: trimmedIp, reason: trimmedReason, createdAt: "방금 전", method: "수동 차단" });
     setIp("");
     setReason("");
   }
 
   function confirmRelease(ipAddress) {
-    if (window.confirm(`${ipAddress} 차단을 해제할까요?`)) {
+    if (typeof window !== "undefined" && window.confirm(`${ipAddress} 차단을 해제할까요?`)) {
       onRemoveBlock(ipAddress);
     }
   }

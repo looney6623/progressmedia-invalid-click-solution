@@ -62,9 +62,9 @@ export async function createManualBlock(payload) {
   return {
     ok: true,
     block: {
-      id: `mock-block-${Date.now()}`,
+      id: "mock-block-001",
       method: "manual",
-      createdAt: new Date().toLocaleString("ko-KR"),
+      createdAt: "2026-05-27 14:30",
       ...payload
     }
   };
@@ -74,7 +74,7 @@ export async function removeBlock(blockId) {
   return {
     ok: true,
     releasedBlockId: blockId,
-    releasedAt: new Date().toLocaleString("ko-KR")
+    releasedAt: "2026-05-27 14:30"
   };
 }
 
@@ -85,7 +85,7 @@ export async function fetchAdvertisers() {
 }
 
 export async function createAdvertiser(payload) {
-  const id = `adv_mock_${Date.now()}`;
+  const id = "adv_mock_001";
   return {
     ok: true,
     advertiser: {
