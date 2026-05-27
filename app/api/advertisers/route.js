@@ -55,14 +55,27 @@ async function getRequester(supabase, request) {
   if (profileError) return { error: profileError.message, status: 500 };
 
   const metadata = userData.user.user_metadata || {};
-  const requester = profile || {
-    id: userData.user.id,
-    email: userData.user.email,
-    name: metadata.name || userData.user.email,
-    role: metadata.role || "marketer",
-    team: metadata.team || "",
-    is_active: true
-  };
+  const fallbackRole = ["admin", "marketer"].includes(metadata.role) ? metadata.role : "";
+  let requester = profile;
+
+  if (!requester) {
+    if (!fallbackRole) return { error: "마케터 권한 profile이 없습니다.", status: 403 };
+
+    requester = {
+      id: userData.user.id,
+      email: userData.user.email,
+      name: metadata.name || userData.user.email,
+      role: fallbackRole,
+      team: metadata.team || "",
+      is_active: true
+    };
+
+    const { error: upsertError } = await supabase
+      .from("pm_profiles")
+      .upsert(requester);
+
+    if (upsertError) return { error: upsertError.message, status: 500 };
+  }
 
   if (!requester.is_active) return { error: "비활성화된 계정입니다.", status: 403 };
   if (!["admin", "marketer"].includes(requester.role)) return { error: "광고주를 생성할 권한이 없습니다.", status: 403 };
@@ -182,7 +195,11 @@ export async function POST(request) {
       password: temporaryPassword,
       contactName
     });
-    if (authUserResult.error) throw new Error(authUserResult.error);
+    if (authUserResult.error) {
+      const error = new Error(authUserResult.error);
+      error.status = authUserResult.status || 500;
+      throw error;
+    }
     authUser = authUserResult.user;
     createdAuthUser = !authUserResult.existing;
 
@@ -252,6 +269,6 @@ export async function POST(request) {
     if (advertiser?.id) {
       await supabase.from("pm_advertisers").delete().eq("id", advertiser.id);
     }
-    return NextResponse.json({ ok: false, error: error.message || "광고주 생성에 실패했습니다." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: error.message || "광고주 생성에 실패했습니다." }, { status: error.status || 500 });
   }
 }
