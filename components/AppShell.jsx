@@ -22,7 +22,7 @@ const routeRoles = {
 export default function AppShell({ title, description, actions, children }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { authReady, authError, user, myAdvertisers, loginLoading, handleSignIn, handleSignUp, handleSignOut } = useAppState();
+  const { authReady, authError, user, myAdvertisers, dataError, loginLoading, handleSignIn, handleSignUp, handleSignOut } = useAppState();
 
   useEffect(() => {
     if (authReady && user && pathname === "/") router.replace("/dashboard");
@@ -87,7 +87,10 @@ export default function AppShell({ title, description, actions, children }) {
       <Sidebar user={user} onSignOut={handleSignOut} />
       <main className="lg:pl-72">
         <PageHeader title={title} description={description} actions={actions} />
-        <div className="space-y-5 px-5 py-5 lg:px-8">{children}</div>
+        <div className="space-y-5 px-5 py-5 lg:px-8">
+          {dataError && <Card className="border-danger/30 bg-danger/10 p-4 text-sm text-danger">{dataError}</Card>}
+          {children}
+        </div>
       </main>
     </div>
   );

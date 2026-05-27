@@ -169,8 +169,23 @@ function mapClickLogFromDb(item) {
   const createdAt = new Date(item.created_at);
   const hour = `${String(createdAt.getHours()).padStart(2, "0")}:00`;
   const dateTime = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(createdAt.getDate()).padStart(2, "0")} ${String(createdAt.getHours()).padStart(2, "0")}:${String(createdAt.getMinutes()).padStart(2, "0")}`;
+  const utm = [item.utm_source, item.utm_medium, item.utm_campaign, item.utm_term, item.utm_content].filter(Boolean).join(" / ");
   return {
     id: item.id,
+    advertiserId: item.advertiser_id,
+    clientId: item.client_id || "",
+    visitorId: item.visitor_id || "",
+    sessionId: item.session_id || "",
+    ipHash: item.ip_hash || "",
+    ipMasked: item.ip_masked || "-",
+    statusRaw: item.click_status || "normal",
+    referrer: item.referrer || "",
+    utm,
+    utmSource: item.utm_source || "",
+    utmMedium: item.utm_medium || "",
+    utmCampaign: item.utm_campaign || "",
+    utmTerm: item.utm_term || "",
+    utmContent: item.utm_content || "",
     createdAt,
     time: `${String(createdAt.getHours()).padStart(2, "0")}:${String(createdAt.getMinutes()).padStart(2, "0")}:${String(createdAt.getSeconds()).padStart(2, "0")}`,
     dateTime,
@@ -186,6 +201,7 @@ function mapClickLogFromDb(item) {
     landingPage: item.page_url || "-",
     dwellSeconds: item.stay_time || 0,
     pageViews: item.page_count || 0,
+    clickCountIn10Min: item.click_count_10m || "-",
     cpc: Number(item.cpc || 0),
     riskScore: item.risk_score || 0,
     status: statusToUi(item.click_status),
@@ -551,16 +567,20 @@ export async function deactivateAdvertiserUser(advertiserUserId) {
 export async function fetchClickLogs(filters = {}) {
   const mode = ensureServiceMode();
   if (mode === "supabase") {
+    if (Array.isArray(filters.advertiserIds) && filters.advertiserIds.length === 0) {
+      return { items: [], total: 0 };
+    }
+
     const supabase = createSupabaseBrowserClient();
     let query = supabase
       .from("pm_click_logs")
-      .select("id,advertiser_id,client_id,visitor_id,session_id,ip_masked,user_agent,page_url,referrer,utm_source,utm_medium,utm_campaign,utm_term,utm_content,stay_time,page_count,click_status,risk_score,reason,cpc,created_at,advertiser:pm_advertisers(name)")
+      .select("id,advertiser_id,client_id,visitor_id,session_id,ip_hash,ip_masked,user_agent,page_url,referrer,utm_source,utm_medium,utm_campaign,utm_term,utm_content,stay_time,page_count,click_status,risk_score,reason,cpc,created_at,advertiser:pm_advertisers(name)")
       .order("created_at", { ascending: false })
       .limit(filters.limit || 500);
 
     if (filters.advertiserIds?.length) query = query.in("advertiser_id", filters.advertiserIds);
     const { data, error } = await query;
-    if (error) return { items: [], total: 0, error: error.message };
+    if (error) return { items: [], total: 0, error: `Supabase pm_click_logs 조회 실패: ${error.message}` };
     const items = (data || []).map(mapClickLogFromDb);
     return { items, total: items.length };
   }
@@ -580,7 +600,42 @@ export async function fetchBlockRules() {
   return { items: getBlockRules() };
 }
 
-export async function createManualBlock(payload) {
+export async function createManualBlock(payload, currentUser) {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    if (!payload.advertiserId || !payload.ipHash) {
+      return { ok: false, error: "차단 등록에는 advertiser_id와 ip_hash가 필요합니다." };
+    }
+
+    const { data, error } = await createSupabaseBrowserClient()
+      .from("pm_blocked_ips")
+      .insert({
+        advertiser_id: payload.advertiserId,
+        ip_hash: payload.ipHash,
+        ip_masked: payload.ipMasked || payload.ip || "-",
+        method: "manual",
+        reason: payload.reason,
+        created_by: currentUser?.id
+      })
+      .select("id,advertiser_id,ip_masked,method,reason,starts_at")
+      .single();
+
+    if (error) return { ok: false, error: `Supabase pm_blocked_ips 저장 실패: ${error.message}` };
+    return {
+      ok: true,
+      block: {
+        id: data.id,
+        advertiserId: data.advertiser_id,
+        ip: data.ip_masked,
+        ipMasked: data.ip_masked,
+        reason: data.reason,
+        method: "수동 차단",
+        createdAt: data.starts_at
+      }
+    };
+  }
+
+  if (mode === "unavailable") return serviceUnavailable();
   return { ok: true, block: { id: "mock-block-001", method: "manual", createdAt: "2026-05-27 14:30", ...payload } };
 }
 

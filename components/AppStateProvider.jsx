@@ -5,6 +5,7 @@ import { getAdvertiserStats, getHourlyTrend, getMediaStats, summarizeClicks } fr
 import { enrichWithManualBlocks, filterClicks } from "@/lib/filterClicks";
 import {
   assignAdvertiserToMarketer,
+  createManualBlock,
   createAdvertiserUser,
   createAdvertiserWithAccount,
   deactivateAdvertiserUser,
@@ -140,8 +141,15 @@ export function AppStateProvider({ children }) {
     await loadAuthContext(null);
   }
 
-  function addManualBlock(item) {
-    setManualBlocks((prev) => [item, ...prev.filter((block) => block.ip !== item.ip)]);
+  async function addManualBlock(item) {
+    const result = await createManualBlock(item, user);
+    if (!result.ok) {
+      setDataError(result.error || "차단 IP 저장에 실패했습니다.");
+      return result;
+    }
+    const block = result.block || item;
+    setManualBlocks((prev) => [block, ...prev.filter((existing) => existing.ip !== block.ip)]);
+    return result;
   }
 
   function removeManualBlock(ip) {
@@ -202,7 +210,7 @@ export function AppStateProvider({ children }) {
     loginLoading,
     user,
     myAdvertisers,
-    allAdvertisers: mockAdvertisers,
+    allAdvertisers: user?.role === "admin" ? myAdvertisers : mockAdvertisers,
     teamMembers,
     assignments,
     advertiserUsers,

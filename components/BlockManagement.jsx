@@ -32,12 +32,22 @@ export default function BlockManagement({ manualBlocks, blockedLogs, onAddBlock,
     return [...manualRows, ...autoRows].slice(0, 24);
   }, [blockedLogs, manualBlocks]);
 
-  function submitBlock(event) {
+  async function submitBlock(event) {
     event.preventDefault();
     const trimmedIp = ip.trim();
     const trimmedReason = reason.trim();
     if (!trimmedIp || !trimmedReason) return;
-    onAddBlock({ ip: trimmedIp, reason: trimmedReason, createdAt: "방금 전", method: "수동 차단" });
+    const candidate = blockedLogs.find((log) => log.ip === trimmedIp || log.ipMasked === trimmedIp || log.ipHash === trimmedIp);
+    const result = await onAddBlock({
+      ip: candidate?.ipMasked || trimmedIp,
+      ipMasked: candidate?.ipMasked || trimmedIp,
+      ipHash: candidate?.ipHash || "",
+      advertiserId: candidate?.advertiserId || "",
+      reason: trimmedReason,
+      createdAt: "방금 전",
+      method: "수동 차단"
+    });
+    if (result && result.ok === false) return;
     setIp("");
     setReason("");
   }

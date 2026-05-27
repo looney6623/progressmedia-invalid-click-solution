@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Eye, RadioTower, X } from "lucide-react";
+import { Eye, RadioTower, RefreshCw, X } from "lucide-react";
 import { Card, SectionDescription, SectionTitle, StatusBadge } from "@/components/ui";
 import { currency } from "@/lib/clickData";
 import { number } from "@/lib/format";
@@ -10,7 +10,7 @@ function maskIp(ip) {
   return `${parts[0]}.${parts[1]}.***.${parts[3]}`;
 }
 
-export default function ClickLogTable({ logs }) {
+export default function ClickLogTable({ logs, onRefresh }) {
   const [sortMode, setSortMode] = useState("latest");
   const [maskIps, setMaskIps] = useState(false);
   const [selectedLog, setSelectedLog] = useState(null);
@@ -53,13 +53,22 @@ export default function ClickLogTable({ logs }) {
           >
             IP 마스킹 {maskIps ? "ON" : "OFF"}
           </button>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panelSoft px-3 text-xs font-semibold text-slate-300 hover:text-white"
+            >
+              <RefreshCw size={14} />
+              새로고침
+            </button>
+          )}
         </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead className="bg-panelSoft text-xs uppercase text-slate-500">
             <tr>
-              {["시간", "광고주", "캠페인", "매체", "키워드", "IP", "체류", "이동", "위험도", "상태", "판정 사유", "상세"].map((head) => (
+          {["시간", "광고주", "client_id", "IP", "페이지 URL", "유입/referrer", "UTM", "체류", "위험도", "상태", "판정 사유", "상세"].map((head) => (
                 <th key={head} className="px-4 py-3 font-semibold">
                   {head}
                 </th>
@@ -71,12 +80,12 @@ export default function ClickLogTable({ logs }) {
               <tr key={log.id} className="hover:bg-panelSoft/60">
                 <td className="whitespace-nowrap px-4 py-3 text-slate-300">{log.time}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-white">{log.advertiser}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-300">{log.campaign}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-300">{log.media}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-400">{log.keyword}</td>
+                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-400">{log.clientId || "-"}</td>
                 <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-400">{maskIps ? maskIp(log.ip) : log.ip}</td>
+                <td className="max-w-[260px] truncate px-4 py-3 text-slate-300">{log.landingPage}</td>
+                <td className="max-w-[220px] truncate px-4 py-3 text-slate-300">{log.referrer || log.media}</td>
+                <td className="max-w-[220px] truncate px-4 py-3 text-slate-400">{log.utm || "-"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-300">{log.dwellSeconds}s</td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-300">{log.pageViews}</td>
                 <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-100">{log.riskScore}</td>
                 <td className="whitespace-nowrap px-4 py-3">
                   <StatusBadge status={log.status} />
@@ -95,7 +104,11 @@ export default function ClickLogTable({ logs }) {
             ))}
           </tbody>
         </table>
-        {logs.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-500">필터 조건에 맞는 클릭 로그가 없습니다.</div>}
+        {logs.length === 0 && (
+          <div className="px-5 py-10 text-center text-sm text-slate-500">
+            아직 수집된 클릭 로그가 없습니다. 광고주 사이트에 설치 스크립트를 삽입하면 이 화면에 실제 클릭 로그가 표시됩니다.
+          </div>
+        )}
       </div>
 
       {selectedLog && (
@@ -113,10 +126,13 @@ export default function ClickLogTable({ logs }) {
             <div className="grid gap-3 p-5 sm:grid-cols-2">
               {[
                 ["광고주", selectedLog.advertiser],
+                ["client_id", selectedLog.clientId || "-"],
                 ["캠페인", selectedLog.campaign],
                 ["키워드", selectedLog.keyword],
                 ["매체", selectedLog.media],
                 ["IP", selectedLog.ip],
+                ["referrer", selectedLog.referrer || "-"],
+                ["UTM", selectedLog.utm || "-"],
                 ["지역/기기", `${selectedLog.region} · ${selectedLog.device}`],
                 ["랜딩 페이지", selectedLog.landingPage],
                 ["브라우저", selectedLog.userAgent],

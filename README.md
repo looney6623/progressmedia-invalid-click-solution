@@ -203,6 +203,76 @@ order by created_at desc
 limit 20;
 ```
 
+## 실제 클릭 로그 기반 대시보드
+
+운영 모드(`PM_PROJECT_ENV=production` 또는 `cloudtype`)에서는 대시보드, 실시간 클릭 로그, 무효클릭 분석, 차단 관리, 광고주 리포트가 `pm_click_logs`에 저장된 실제 로그를 기준으로 계산됩니다. Supabase 연결 실패 시 mock 데이터로 조용히 전환하지 않고 화면 상단에 조회 오류를 표시합니다. local/development 모드에서만 더미 클릭 데이터를 사용할 수 있습니다.
+
+role별 조회 범위:
+
+- `admin`: 전체 광고주와 전체 `pm_click_logs` 조회
+- `marketer`: `pm_marketer_advertisers`에 연결된 광고주의 로그만 조회
+- `advertiser`: `pm_advertiser_users`에 연결된 본인 광고주의 로그만 조회
+
+대시보드 KPI는 `click_status` 값을 기준으로 계산합니다.
+
+- `normal`: 정상 클릭
+- `suspicious`: 의심 클릭
+- `blocked`: 차단 클릭
+
+`pm_click_logs` 필수 운영 컬럼:
+
+```sql
+advertiser_id uuid,
+client_id text,
+visitor_id text,
+session_id text,
+ip_hash text,
+ip_masked text,
+user_agent text,
+page_url text,
+referrer text,
+utm_source text,
+utm_medium text,
+utm_campaign text,
+utm_term text,
+utm_content text,
+stay_time integer,
+page_count integer,
+click_status text,
+risk_score integer,
+reason text,
+cpc numeric,
+created_at timestamp with time zone
+```
+
+운영 로그 확인 SQL:
+
+```sql
+select
+  l.created_at,
+  a.name as advertiser_name,
+  l.client_id,
+  l.ip_masked,
+  l.page_url,
+  l.referrer,
+  l.utm_source,
+  l.utm_medium,
+  l.utm_campaign,
+  l.click_status,
+  l.risk_score,
+  l.reason
+from public.pm_click_logs l
+left join public.pm_advertisers a on a.id = l.advertiser_id
+order by l.created_at desc
+limit 50;
+```
+
+IP 정책:
+
+- 화면과 CSV에는 `ip_masked`만 표시합니다.
+- `ip_hash`는 반복 클릭 집계와 `pm_blocked_ips` 저장 기준으로만 사용합니다.
+- IP 원문은 저장하거나 화면에 노출하지 않습니다.
+
 광고주 생성 후 확인 SQL:
 
 ```sql
