@@ -16,6 +16,24 @@ function readValue(body, snakeKey, camelKey) {
   return body[snakeKey] ?? body[camelKey] ?? "";
 }
 
+function isSchemaMismatch(error) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || "");
+  return ["42703", "42P01", "PGRST204", "PGRST205"].includes(code)
+    || message.includes("column")
+    || message.includes("schema cache")
+    || message.includes("does not exist");
+}
+
+function schemaMismatchResponse(error) {
+  return json({
+    ok: false,
+    error: "DB_SCHEMA_MISMATCH",
+    message: "pm_conversion_events 스키마가 최신 컬럼 구조와 일치하지 않습니다. docs/AUTH_RLS_SCHEMA.sql의 pm_conversion_events 섹션을 반영해 주세요.",
+    detail: error?.message
+  }, { status: 500 });
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders });
 }
@@ -44,7 +62,8 @@ export async function POST(request) {
       accepted: localMode,
       todo: "Supabase 연결 후 stay_time 업데이트 또는 conversion 이벤트 저장을 수행합니다.",
       privacy: "IP 원문은 저장하지 않고 ip_hash/ip_masked만 사용합니다.",
-      error: localMode ? undefined : "운영 모드에서는 Supabase service role 설정이 필요합니다."
+      error: localMode ? undefined : "SERVER_CONFIGURATION_ERROR",
+      message: localMode ? undefined : "운영 모드에서는 Supabase service role 설정이 필요합니다."
     }, { status: localMode ? 200 : 503 });
   }
 
@@ -62,8 +81,10 @@ export async function POST(request) {
     return json({ ok: false, error: "invalid client_id or project_key", message: "client_id 또는 project_key가 일치하지 않습니다." }, { status: 403 });
   }
 
-  const stayTime = Number(readValue(body, "stay_time", "stayTime") || Math.round(Number(readValue(body, "duration_ms", "durationMs") || 0) / 1000) || 0);
+  const durationMs = Number(readValue(body, "duration_ms", "durationMs") || 0);
+  const stayTime = Number(readValue(body, "stay_time", "stayTime") || Math.round(durationMs / 1000) || 0);
   const pageUrl = readValue(body, "page_url", "pageUrl") || body.url || "";
+  const conversionData = body.conversion_data || body.data || {};
 
   if (eventType === "stay_time" || eventType === "pagehide" || eventType === "visibility_hidden") {
     const { data: latestLog, error: latestLogError } = await supabase
@@ -94,18 +115,33 @@ export async function POST(request) {
     const payload = {
       advertiser_id: advertiser.id,
       client_id: clientId,
+      project_key: projectKey,
       visitor_id: visitorId,
       session_id: sessionId,
-      event_type: eventType,
-      page_url: pageUrl,
-      conversion_data: body.conversion_data || body.data || {},
       ip_hash: ipHash,
       ip_masked: ipMasked,
+      user_agent: readValue(body, "user_agent", "userAgent"),
+      page_url: pageUrl,
+      referrer: body.referrer || "",
+      utm_source: body.utm_source || "",
+      utm_medium: body.utm_medium || "",
+      utm_campaign: body.utm_campaign || "",
+      utm_term: body.utm_term || "",
+      utm_content: body.utm_content || "",
+      event_name: body.event_name || body.eventName || eventType,
+      event_type: eventType,
+      value: body.value ?? conversionData.value ?? null,
+      currency: body.currency || conversionData.currency || null,
+      metadata: body.metadata || {},
+      conversion_data: conversionData,
       created_at: new Date().toISOString()
     };
     const { error } = await supabase.from("pm_conversion_events").insert(payload);
-    if (error && !String(error.message).includes("does not exist")) return json({ ok: false, error: error.message }, { status: 500 });
-    return json({ ok: true, stored: !error, message: error ? "pm_conversion_events 테이블이 없어 conversion 이벤트 저장은 건너뛰었습니다." : "conversion 이벤트가 저장되었습니다." });
+    if (error) {
+      if (isSchemaMismatch(error)) return schemaMismatchResponse(error);
+      return json({ ok: false, error: error.message }, { status: 500 });
+    }
+    return json({ ok: true, stored: true, message: "conversion 이벤트가 저장되었습니다." });
   }
 
   return json({ ok: true, ignored: true, eventType });

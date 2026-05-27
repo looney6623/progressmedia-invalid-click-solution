@@ -38,7 +38,9 @@ IP_HASH_SALT=change-me
 
 - `SUPABASE_SERVICE_ROLE_KEY`는 서버 API Route에서만 사용합니다.
 - `IP_HASH_SALT`는 서버에서 IP hash 생성에만 사용합니다.
+- Cloudtype 운영 환경에는 `IP_HASH_SALT`가 반드시 필요합니다.
 - 두 값에는 절대 `NEXT_PUBLIC_` 접두어를 붙이지 않습니다.
+- 특히 `IP_HASH_SALT`에는 `NEXT_PUBLIC_` 접두어를 붙이면 안 됩니다.
 - `.env.local`은 Git에 포함하지 않습니다.
 
 ## Supabase 연결 순서
@@ -186,6 +188,32 @@ https://advertiser.example/test-page?utm_source=naver&utm_medium=cpc&utm_campaig
 - 화면에서 `client_id`, `project_key`를 입력하고 `/api/collect`, `/api/events`, conversion 이벤트를 수동 테스트할 수 있습니다.
 - Cloudtype 배포 URL 기준으로 `https://배포도메인/test-advertiser.html`에 접속해 본 서버 수집 흐름을 확인합니다.
 
+## 본 서버 QA 성공 결과
+
+Cloudtype 본 서버 기준으로 아래 QA가 성공했습니다.
+
+- `/api/collect` 수동 테스트 성공
+- `/api/events` `stay_time` 체류시간 업데이트 성공
+- `/api/events` `conversion` 이벤트 저장 성공
+- Supabase `pm_click_logs` 저장 정상
+- Supabase `pm_conversion_events` 저장 정상
+- IP 원문은 저장하지 않고 `ip_hash`, `ip_masked` 구조 사용 확인
+
+필수 운영 환경변수:
+
+```env
+NEXT_PUBLIC_APP_URL=https://배포도메인
+NEXT_PUBLIC_TRACKER_URL=https://배포도메인/pm-click-shield.js
+NEXT_PUBLIC_SUPABASE_URL=https://프로젝트.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+PM_PROJECT_ENV=cloudtype
+LOG_RETENTION_DAYS=90
+IP_HASH_SALT=change-me
+```
+
+`SUPABASE_SERVICE_ROLE_KEY`, `IP_HASH_SALT`는 서버 전용이며, `NEXT_PUBLIC_` 접두어를 붙이지 않습니다. `.env.local`은 Git에 포함하지 않습니다.
+
 ## /api/collect 테스트
 
 local/development 모드에서는 Supabase가 없어도 구조화된 mock 응답을 반환합니다. 운영 모드에서는 `pm_advertisers.client_id`, `pm_advertisers.project_key`가 일치해야 저장됩니다.
@@ -217,7 +245,8 @@ curl -X POST "$NEXT_PUBLIC_APP_URL/api/collect" \
 `/api/events`는 체류시간과 전환 이벤트를 수신합니다.
 
 - `event_type=stay_time`: 가장 최근 `visitor_id/session_id` 로그의 `stay_time` 업데이트
-- `event_type=conversion`: `pm_conversion_events` 테이블이 있으면 저장
+- `event_type=conversion`: `pm_conversion_events`에 저장
+- conversion 저장 시 테이블 또는 컬럼이 누락되어 있으면 `DB_SCHEMA_MISMATCH`를 반환합니다.
 
 ## Supabase 저장 확인
 
@@ -268,6 +297,43 @@ select
   risk_score,
   reason
 from public.pm_click_logs
+where client_id = '광고주 client_id'
+order by created_at desc
+limit 50;
+```
+
+전환 이벤트 저장 확인:
+
+```sql
+select
+  created_at,
+  advertiser_id,
+  client_id,
+  project_key,
+  visitor_id,
+  session_id,
+  ip_masked,
+  page_url,
+  referrer,
+  utm_source,
+  utm_medium,
+  utm_campaign,
+  event_name,
+  event_type,
+  value,
+  currency,
+  conversion_data,
+  metadata
+from public.pm_conversion_events
+order by created_at desc
+limit 50;
+```
+
+특정 `client_id` 기준 전환 이벤트 확인:
+
+```sql
+select created_at, client_id, event_name, event_type, page_url, ip_masked, conversion_data
+from public.pm_conversion_events
 where client_id = '광고주 client_id'
 order by created_at desc
 limit 50;

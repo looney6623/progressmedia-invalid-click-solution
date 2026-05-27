@@ -6,17 +6,23 @@
     <title>ProgressMedia Tracker Test</title>
     <style>
       body { margin: 0; min-height: 100vh; font-family: Arial, sans-serif; background: #101820; color: #e5eef7; }
-      main { width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0; }
+      main { width: min(960px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0; }
       section { border: 1px solid #253241; background: #14202b; padding: 22px; border-radius: 8px; margin-top: 16px; }
       label { display: block; margin-top: 12px; font-size: 13px; color: #aab6c3; }
       input { box-sizing: border-box; width: 100%; height: 40px; margin-top: 6px; border: 1px solid #253241; border-radius: 6px; background: #101820; color: #e5eef7; padding: 0 10px; }
       code, pre { color: #3df2b8; }
-      pre { overflow: auto; min-height: 160px; border: 1px solid #253241; border-radius: 6px; background: #101820; padding: 14px; white-space: pre-wrap; }
+      pre { overflow: auto; min-height: 180px; border: 1px solid #253241; border-radius: 6px; background: #101820; padding: 14px; white-space: pre-wrap; }
       button { min-height: 42px; border: 0; border-radius: 6px; background: #3df2b8; color: #101820; font-weight: 700; padding: 0 16px; cursor: pointer; margin-top: 14px; margin-right: 8px; }
       button.secondary { background: #253241; color: #e5eef7; }
       p, li { line-height: 1.65; color: #aab6c3; }
       .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-      @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+      .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+      .status { border: 1px solid #253241; border-radius: 8px; background: #101820; padding: 14px; }
+      .status strong { display: block; margin-bottom: 6px; }
+      .status.pending { color: #aab6c3; }
+      .status.success { border-color: rgba(61, 242, 184, 0.55); color: #3df2b8; }
+      .status.error { border-color: rgba(255, 91, 112, 0.6); color: #ff5b70; }
+      @media (max-width: 760px) { .grid, .status-grid { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
@@ -24,7 +30,7 @@
       <h1>ProgressMedia 추적 스크립트 본 서버 QA</h1>
       <p>
         Cloudtype 배포 URL에서 이 페이지를 열고 실제 광고주의 <code>client_id</code>, <code>project_key</code>를 입력해
-        <code>/api/collect</code>와 <code>/api/events</code> 저장 흐름을 확인합니다.
+        <code>/api/collect</code>, <code>/api/events</code>, <code>pm_conversion_events</code> 저장 흐름을 확인합니다.
       </p>
 
       <section>
@@ -44,9 +50,15 @@
           <input id="pageUrl" />
         </label>
         <p>UTM 테스트 예시: <code>?utm_source=naver&utm_medium=cpc&utm_campaign=test_campaign&utm_term=invalid-click-test</code></p>
-        <button onclick="sendCollect()">/api/collect 수동 테스트</button>
-        <button class="secondary" onclick="sendStayTime()">/api/events 체류시간 테스트</button>
-        <button class="secondary" onclick="sendConversion()">conversion 이벤트 테스트</button>
+        <button onclick="sendCollect()">/api/collect 테스트</button>
+        <button class="secondary" onclick="sendStayTime()">stay_time 테스트</button>
+        <button class="secondary" onclick="sendConversion()">conversion 테스트</button>
+
+        <div class="status-grid">
+          <div id="collectStatus" class="status pending"><strong>collect</strong><span>대기 중</span></div>
+          <div id="stayStatus" class="status pending"><strong>stay_time</strong><span>대기 중</span></div>
+          <div id="conversionStatus" class="status pending"><strong>conversion</strong><span>대기 중</span></div>
+        </div>
       </section>
 
       <section>
@@ -56,7 +68,7 @@
       </section>
 
       <section>
-        <h2>3. 테스트 결과</h2>
+        <h2>3. 마지막 테스트 결과 JSON</h2>
         <pre id="result">아직 테스트 전입니다.</pre>
       </section>
     </main>
@@ -103,7 +115,19 @@
           '<\\/script>';
       }
 
-      async function postJson(path, payload) {
+      function setStatus(id, state, text) {
+        var el = document.getElementById(id);
+        el.className = "status " + state;
+        el.querySelector("span").textContent = text;
+      }
+
+      function labelError(body) {
+        if (!body) return "SERVER_CONFIGURATION_ERROR";
+        return body.error || body.code || body.message || "SERVER_CONFIGURATION_ERROR";
+      }
+
+      async function postJson(path, payload, statusId, successText) {
+        setStatus(statusId, "pending", "요청 중...");
         resultBox.textContent = "요청 중...";
         try {
           var response = await fetch(path, {
@@ -112,31 +136,45 @@
             body: JSON.stringify(payload)
           });
           var json = await response.json();
-          resultBox.textContent = JSON.stringify({ status: response.status, body: json }, null, 2);
+          var result = { status: response.status, body: json };
+          resultBox.textContent = JSON.stringify(result, null, 2);
+          if (response.ok && json.ok !== false) {
+            setStatus(statusId, "success", successText || "저장 성공");
+          } else {
+            setStatus(statusId, "error", labelError(json));
+          }
+          return result;
         } catch (error) {
-          resultBox.textContent = JSON.stringify({ ok: false, error: error.message }, null, 2);
+          var failed = { ok: false, error: "SERVER_CONFIGURATION_ERROR", message: error.message };
+          resultBox.textContent = JSON.stringify(failed, null, 2);
+          setStatus(statusId, "error", failed.error);
+          return failed;
         }
       }
 
       function sendCollect() {
-        postJson("/api/collect", getPayload({ event_type: "page_load" }));
+        return postJson("/api/collect", getPayload({ event_type: "page_load" }), "collectStatus", "저장 성공");
       }
 
       function sendStayTime() {
-        postJson("/api/events", getPayload({
+        return postJson("/api/events", getPayload({
           event_type: "stay_time",
           stay_time: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
           duration_ms: Math.max(1, Date.now() - startedAt)
-        }));
+        }), "stayStatus", "저장 성공");
       }
 
       function sendConversion() {
-        postJson("/api/events", getPayload({
+        return postJson("/api/events", getPayload({
           event_type: "conversion",
+          event_name: "test_conversion",
           stay_time: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
           duration_ms: Math.max(1, Date.now() - startedAt),
-          conversion_data: { source: "test-advertiser", action: "button_click" }
-        }));
+          conversion_data: { source: "test-advertiser", action: "button_click" },
+          metadata: { qa: true },
+          value: 0,
+          currency: "KRW"
+        }), "conversionStatus", "저장 성공");
       }
 
       clientInput.addEventListener("input", updatePreview);

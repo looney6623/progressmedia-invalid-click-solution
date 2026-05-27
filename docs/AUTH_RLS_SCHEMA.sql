@@ -125,15 +125,53 @@ create table if not exists public.pm_conversion_events (
   id uuid primary key default gen_random_uuid(),
   advertiser_id uuid not null references public.pm_advertisers(id) on delete cascade,
   client_id text,
+  project_key text,
   visitor_id text,
   session_id text,
-  event_type text not null default 'conversion',
-  page_url text,
-  conversion_data jsonb not null default '{}'::jsonb,
   ip_hash text,
   ip_masked text,
+  user_agent text,
+  page_url text,
+  referrer text,
+  utm_source text,
+  utm_medium text,
+  utm_campaign text,
+  utm_term text,
+  utm_content text,
+  event_name text,
+  event_type text not null default 'conversion',
+  value numeric,
+  currency text,
+  metadata jsonb not null default '{}'::jsonb,
+  conversion_data jsonb not null default '{}'::jsonb,
   created_at timestamp with time zone not null default now()
 );
+
+alter table public.pm_conversion_events add column if not exists advertiser_id uuid references public.pm_advertisers(id) on delete cascade;
+alter table public.pm_conversion_events add column if not exists client_id text;
+alter table public.pm_conversion_events add column if not exists project_key text;
+alter table public.pm_conversion_events add column if not exists visitor_id text;
+alter table public.pm_conversion_events add column if not exists session_id text;
+alter table public.pm_conversion_events add column if not exists ip_hash text;
+alter table public.pm_conversion_events add column if not exists ip_masked text;
+alter table public.pm_conversion_events add column if not exists user_agent text;
+alter table public.pm_conversion_events add column if not exists page_url text;
+alter table public.pm_conversion_events add column if not exists referrer text;
+alter table public.pm_conversion_events add column if not exists utm_source text;
+alter table public.pm_conversion_events add column if not exists utm_medium text;
+alter table public.pm_conversion_events add column if not exists utm_campaign text;
+alter table public.pm_conversion_events add column if not exists utm_term text;
+alter table public.pm_conversion_events add column if not exists utm_content text;
+alter table public.pm_conversion_events add column if not exists event_name text;
+alter table public.pm_conversion_events add column if not exists event_type text not null default 'conversion';
+alter table public.pm_conversion_events add column if not exists value numeric;
+alter table public.pm_conversion_events add column if not exists currency text;
+alter table public.pm_conversion_events add column if not exists metadata jsonb not null default '{}'::jsonb;
+alter table public.pm_conversion_events add column if not exists conversion_data jsonb not null default '{}'::jsonb;
+alter table public.pm_conversion_events add column if not exists created_at timestamp with time zone not null default now();
+
+create index if not exists idx_pm_conversion_events_advertiser_created_at on public.pm_conversion_events(advertiser_id, created_at desc);
+create index if not exists idx_pm_conversion_events_client_created_at on public.pm_conversion_events(client_id, created_at desc);
 
 alter table public.pm_conversion_events enable row level security;
 
@@ -323,3 +361,5 @@ using (public.pm_can_access_advertiser(advertiser_id));
 -- 1. 광고주 Auth 사용자 생성은 Supabase Admin API가 필요하므로 서버 API에서 service role key로 처리하세요.
 -- 2. collect/events API의 insert도 서버 API 또는 Edge Function에서 service role key로 처리하세요.
 -- 3. 클라이언트에는 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY만 노출하세요.
+
+notify pgrst, 'reload schema';
