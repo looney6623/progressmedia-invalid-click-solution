@@ -9,6 +9,9 @@ import {
 import { createSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabaseClient";
 
 const MOCK_SESSION_KEY = "pm_mock_user_email";
+const COMPANY_EMAIL_DOMAIN = "my-progress.co.kr";
+const COMPANY_EMAIL_PATTERN = /^[^\s@]+@my-progress\.co\.kr$/i;
+const COMPANY_EMAIL_ERROR = `회사 이메일만 가입 가능합니다. 허용 도메인: ${COMPANY_EMAIL_DOMAIN}`;
 
 let advertiserSequence = 6;
 let advertiserUserSequence = 3;
@@ -24,9 +27,9 @@ export let mockAdvertisers = [
 ];
 
 let mockUsers = [
-  { id: "user_admin", email: "admin@progressmedia.co.kr", name: "관리자", role: "admin", team: "운영관리", isActive: true },
-  { id: "user_marketer_1", email: "marketer1@progressmedia.co.kr", name: "윤인홍", role: "marketer", team: "퍼포먼스1팀", isActive: true },
-  { id: "user_marketer_2", email: "marketer2@progressmedia.co.kr", name: "마케터B", role: "marketer", team: "퍼포먼스2팀", isActive: true },
+  { id: "user_admin", email: "admin@my-progress.co.kr", name: "관리자", role: "admin", team: "운영관리", isActive: true },
+  { id: "user_marketer_1", email: "yxxn98@my-progress.co.kr", name: "윤인홍", role: "marketer", team: "퍼포먼스1팀", isActive: true },
+  { id: "user_marketer_2", email: "marketer2@my-progress.co.kr", name: "마케터B", role: "marketer", team: "퍼포먼스2팀", isActive: true },
   { id: "user_client_shabu20", email: "client-shabu20@example.com", name: "샤브20 광고주", role: "advertiser", team: "샤브20", isActive: true },
   { id: "user_client_3pay", email: "client-3pay@example.com", name: "3분페이 광고주", role: "advertiser", team: "3분페이", isActive: true }
 ];
@@ -99,6 +102,10 @@ export function isSupabaseAuthEnabled() {
   return hasSupabaseConfig();
 }
 
+function isAllowedCompanyEmail(email) {
+  return COMPANY_EMAIL_PATTERN.test(email.trim());
+}
+
 export async function fetchCurrentUser() {
   if (hasSupabaseConfig()) {
     const supabase = createSupabaseBrowserClient();
@@ -141,10 +148,15 @@ export async function signInWithEmail(email, password) {
 }
 
 export async function signUpMarketerAccount({ name, email, password, team }) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!isAllowedCompanyEmail(normalizedEmail)) {
+    return { ok: false, error: COMPANY_EMAIL_ERROR };
+  }
+
   if (hasSupabaseConfig()) {
     const supabase = createSupabaseBrowserClient();
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         data: {
@@ -160,7 +172,7 @@ export async function signUpMarketerAccount({ name, email, password, team }) {
     if (data.user) {
       const profile = {
         id: data.user.id,
-        email,
+        email: normalizedEmail,
         name,
         role: "marketer",
         team,
@@ -173,7 +185,6 @@ export async function signUpMarketerAccount({ name, email, password, team }) {
     return { ok: true, user: await fetchCurrentUser() };
   }
 
-  const normalizedEmail = email.trim().toLowerCase();
   const exists = mockUsers.some((user) => user.email.toLowerCase() === normalizedEmail);
   if (exists) return { ok: false, error: "이미 등록된 이메일입니다." };
 

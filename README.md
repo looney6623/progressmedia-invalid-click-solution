@@ -32,8 +32,8 @@ npm run build
 ## 계정 구조
 
 - 관리자: 서버 운영자가 Supabase Auth/DB에서 직접 생성하는 마스터 계정입니다. 일반 로그인 화면에서 관리자 계정을 생성할 수 없습니다.
-- 마케터: 내부 직원이 로그인 화면에서 직접 계정을 생성할 수 있습니다. 회원가입 시 role은 항상 `marketer`로 저장됩니다.
-- 광고주: 마케터가 대시보드 내부의 광고주 생성/광고주 계정 관리 화면에서 생성하고 발급합니다. 광고주 계정은 role `advertiser`로 저장되며 `pm_advertiser_users`를 통해 특정 `advertiser_id`와 연결됩니다.
+- 마케터: 내부 직원이 로그인 화면에서 직접 계정을 생성할 수 있습니다. 회사 내부 마케터 계정 도메인은 `@my-progress.co.kr` 기준이며, 회원가입 시 role은 항상 `marketer`로 저장됩니다.
+- 광고주: 마케터가 대시보드 내부의 광고주 생성/광고주 계정 관리 화면에서 생성하고 발급합니다. 광고주 계정은 광고주 담당자 이메일을 사용할 수 있으며, role `advertiser`로 저장되고 `pm_advertiser_users`를 통해 특정 `advertiser_id`와 연결됩니다.
 
 관리자 계정은 운영 대표 또는 서버 운영자만 알고 있는 별도 마스터 계정 개념입니다. UI에는 “관리자 계정 생성하기” 또는 admin role 선택을 노출하지 않습니다.
 
@@ -97,8 +97,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ## Supabase Auth 사용자 생성 방법
 
 - 관리자: 서버 운영자가 Supabase Auth/DB 콘솔 또는 안전한 서버 스크립트에서 직접 생성합니다.
-- 마케터: 로그인 화면의 `마케터 계정 생성하기`에서 생성합니다. role은 `marketer`로 고정됩니다.
-- 광고주: 마케터가 대시보드에서 광고주 생성 또는 광고주 계정 관리 기능으로 발급합니다. role은 `advertiser`로 고정됩니다.
+- 마케터: 로그인 화면의 `마케터 계정 생성하기`에서 생성합니다. `@my-progress.co.kr` 회사 이메일만 허용되며 role은 `marketer`로 고정됩니다.
+- 광고주: 마케터가 대시보드에서 광고주 생성 또는 광고주 계정 관리 기능으로 발급합니다. 광고주 담당자 이메일을 사용할 수 있고 role은 `advertiser`로 고정됩니다.
 
 ## Cloudtype 환경변수
 
@@ -113,9 +113,9 @@ Cloudtype 배포 시 프로젝트 환경변수에 아래 값을 등록합니다.
 
 Supabase 환경변수가 없을 때 개발 확인용으로 사용할 수 있는 예시 계정입니다. 로그인 화면의 mock 안내는 테스트 편의를 위한 것이며, 실제 운영 계정이 고정 계정으로 운영된다는 의미가 아닙니다.
 
-- `admin@progressmedia.co.kr` / 개발·마스터 테스트용
-- `marketer1@progressmedia.co.kr` / 마케터 예시 / 샤브20, 3분페이 관리
-- `marketer2@progressmedia.co.kr` / 마케터 예시 / 대주바이오, 바른숨병원 관리
+- `admin@my-progress.co.kr` / 개발·마스터 테스트용
+- `yxxn98@my-progress.co.kr` / 마케터 예시 / 샤브20, 3분페이 관리
+- `marketer2@my-progress.co.kr` / 마케터B 예시 / 대주바이오, 바른숨병원 관리
 - `client-shabu20@example.com` / 광고주 예시 / 샤브20만 접근
 - `client-3pay@example.com` / 광고주 예시 / 3분페이만 접근
 
