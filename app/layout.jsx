@@ -1,4 +1,5 @@
 import "./globals.css";
+import { AppStateProvider } from "@/components/AppStateProvider";
 
 export const metadata = {
   title: "프로그레스미디어 무효클릭차단 솔루션",
@@ -8,7 +9,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        <AppStateProvider>{children}</AppStateProvider>
+      </body>
     </html>
   );
 }

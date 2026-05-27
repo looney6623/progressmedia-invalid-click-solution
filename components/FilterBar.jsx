@@ -12,7 +12,7 @@ function FilterSelect({ label, value, onChange, options }) {
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-md border border-line bg-ink px-3 text-sm text-slate-200 outline-none focus:border-brand"
+        className="h-10 rounded-md border border-line bg-ink px-3 text-sm text-slate-200 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -31,7 +31,7 @@ export default function FilterBar({ filters, setFilters, advertiserOptions }) {
     <Card className="p-5 no-print">
       <div className="mb-4">
         <p className="text-sm font-semibold text-white">통합 필터</p>
-        <p className="mt-1 text-xs text-slate-500">선택한 조건은 KPI, 차트, 로그, 리포트에 동시에 반영됩니다.</p>
+        <p className="mt-1 text-xs text-slate-500">선택한 조건은 KPI, 차트, 로그, 리포트에 함께 반영됩니다.</p>
       </div>
       <div className="grid gap-4 lg:grid-cols-[repeat(4,minmax(0,1fr))_1.4fr]">
         <FilterSelect label="광고주" value={filters.advertiser} onChange={(advertiser) => setFilters((prev) => ({ ...prev, advertiser }))} options={advertisers} />
@@ -40,7 +40,7 @@ export default function FilterBar({ filters, setFilters, advertiserOptions }) {
         <FilterSelect label="날짜" value={filters.dateRange} onChange={(dateRange) => setFilters((prev) => ({ ...prev, dateRange }))} options={dateOptions} />
         <label className="flex min-w-0 flex-col gap-1.5">
           <span className="text-xs font-semibold text-slate-500">검색</span>
-          <span className="flex h-10 items-center gap-2 rounded-md border border-line bg-ink px-3 focus-within:border-brand">
+          <span className="flex h-10 items-center gap-2 rounded-md border border-line bg-ink px-3 transition focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
             <Search size={16} className="shrink-0 text-slate-500" />
             <input
               value={filters.query}
