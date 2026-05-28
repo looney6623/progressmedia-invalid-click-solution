@@ -45,7 +45,7 @@ const menuGroups = [
     items: [
       { href: "/invalid-clicks/ad-click-ip", label: "광고 클릭 IP", icon: MousePointerClick, roles: ["admin", "marketer", "advertiser"] },
       { href: "/invalid-clicks/suspicious-ip", label: "의심 클릭 IP", icon: ShieldAlert, roles: ["admin", "marketer", "advertiser"] },
-      { href: "/invalid-clicks/blocked-ip", label: "차단된 IP", icon: Ban, roles: ["admin", "marketer", "advertiser"] },
+      { href: "/invalid-clicks/blocked-ip", label: "차단 판정 로그", icon: Ban, roles: ["admin", "marketer", "advertiser"] },
       { href: "/invalid-clicks/repeated-ip", label: "반복 클릭 IP", icon: LineChart, roles: ["admin", "marketer"] },
       { href: "/invalid-clicks/exposure-limited-ip", label: "노출제한 IP", icon: Target, roles: ["admin", "marketer"] }
     ]

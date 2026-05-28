@@ -74,7 +74,9 @@ export async function GET(request) {
   const ctx = await withAuth(request);
   if (ctx.fallback) return ctx.fallback;
   const { supabase, accessibleIds } = ctx;
-  const status = new URL(request.url).searchParams.get("status") || "active";
+  const searchParams = new URL(request.url).searchParams;
+  const status = searchParams.get("status") || "active";
+  const active = searchParams.get("active");
 
   if (Array.isArray(accessibleIds) && accessibleIds.length === 0) return json({ ok: true, items: [] });
 
@@ -82,7 +84,9 @@ export async function GET(request) {
     .from("pm_blocked_ips")
     .select("id,advertiser_id,client_id,ip_hash,ip_masked,reason,block_type,source,is_active,created_by,created_at,released_at,release_reason,advertiser:pm_advertisers(name)")
     .order("created_at", { ascending: false });
-  if (status === "released") query = query.or("is_active.eq.false,released_at.not.is.null");
+  if (active === "true") query = query.eq("is_active", true);
+  else if (active === "false") query = query.or("is_active.eq.false,released_at.not.is.null");
+  else if (status === "released") query = query.or("is_active.eq.false,released_at.not.is.null");
   else if (status !== "all") query = query.eq("is_active", true);
   if (accessibleIds) query = query.in("advertiser_id", accessibleIds);
   const { data, error } = await query;

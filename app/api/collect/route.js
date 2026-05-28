@@ -54,7 +54,7 @@ export async function POST(request) {
   const supabase = createSupabaseServiceClient();
   const { data: advertiser, error: advertiserError } = await supabase
     .from("pm_advertisers")
-    .select("id,client_id,project_key,status")
+    .select("id,client_id,project_key,status,blocking_enabled")
     .eq("client_id", clientId)
     .eq("project_key", projectKey)
     .eq("status", "active")
@@ -73,7 +73,8 @@ export async function POST(request) {
     stayTime,
     pageCount,
     referrer: body.referrer || "",
-    utmSource: body.utm_source || ""
+    utmSource: body.utm_source || "",
+    blockingEnabled: advertiser.blocking_enabled !== false
   });
   const createdAt = new Date().toISOString();
   const payload = {
@@ -106,6 +107,40 @@ export async function POST(request) {
   const { data: inserted, error: insertError } = await supabase.from("pm_click_logs").insert(payload).select("id,click_status,risk_score,reason,recent_count,applied_rules,created_at").single();
   if (insertError) return json({ ok: false, error: insertError.message }, { status: 500 });
 
+  let autoBlock = null;
+  if (detection.click_status === "blocked" && detection.auto_block_create && !detection.matched_block) {
+    const { data: existingAuto } = await supabase
+      .from("pm_blocked_ips")
+      .select("id,advertiser_id,client_id,ip_hash,ip_masked,reason,block_type,source,is_active,created_at")
+      .eq("advertiser_id", advertiser.id)
+      .eq("ip_hash", ipHash)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (existingAuto) {
+      autoBlock = existingAuto;
+    } else {
+      const { data: createdAuto, error: autoBlockError } = await supabase
+        .from("pm_blocked_ips")
+        .insert({
+          advertiser_id: advertiser.id,
+          client_id: clientId,
+          ip_hash: ipHash,
+          ip_masked: ipMasked,
+          reason: detection.reason || "자동 반복 클릭 차단",
+          block_type: "auto",
+          source: "collect",
+          is_active: true
+        })
+        .select("id,advertiser_id,client_id,ip_hash,ip_masked,reason,block_type,source,is_active,created_at")
+        .single();
+      if (autoBlockError) {
+        console.error("[collect] auto block create failed", autoBlockError.message);
+      } else {
+        autoBlock = createdAuto;
+      }
+    }
+  }
+
   return json({
     ok: true,
     stored: true,
@@ -117,6 +152,8 @@ export async function POST(request) {
       recent_count: inserted.recent_count,
       applied_rules: inserted.applied_rules || detection.applied_rules || [],
       matched_block: detection.matched_block,
+      auto_block_created: Boolean(autoBlock),
+      auto_block: autoBlock ? { id: autoBlock.id, block_type: autoBlock.block_type, source: autoBlock.source } : null,
       created_at: inserted.created_at
     }
   });

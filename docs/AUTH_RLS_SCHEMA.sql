@@ -19,6 +19,7 @@ create table if not exists public.pm_advertisers (
   site_url text,
   project_key text not null unique,
   status text not null default 'active' check (status in ('active', 'inactive')),
+  blocking_enabled boolean not null default true,
   created_by uuid references public.pm_profiles(id),
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now()
@@ -82,6 +83,7 @@ create table if not exists public.pm_block_rules (
   threshold integer,
   risk_delta integer not null default 0,
   is_enabled boolean not null default true,
+  auto_block_create boolean not null default false,
   created_by uuid references auth.users(id),
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
@@ -118,6 +120,7 @@ notify pgrst, 'reload schema';
 alter table public.pm_advertisers add column if not exists site_url text;
 alter table public.pm_advertisers add column if not exists project_key text;
 alter table public.pm_advertisers add column if not exists created_by uuid references public.pm_profiles(id);
+alter table public.pm_advertisers add column if not exists blocking_enabled boolean not null default true;
 
 alter table public.pm_click_logs add column if not exists client_id text;
 alter table public.pm_click_logs add column if not exists visitor_id text;
@@ -164,6 +167,7 @@ create table if not exists public.pm_block_rules (
   threshold integer,
   risk_delta integer not null default 0,
   is_enabled boolean not null default true,
+  auto_block_create boolean not null default false,
   created_by uuid references auth.users(id),
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
@@ -178,6 +182,7 @@ alter table public.pm_block_rules add column if not exists action text not null 
 alter table public.pm_block_rules add column if not exists threshold integer;
 alter table public.pm_block_rules add column if not exists risk_delta integer not null default 0;
 alter table public.pm_block_rules add column if not exists is_enabled boolean not null default true;
+alter table public.pm_block_rules add column if not exists auto_block_create boolean not null default false;
 alter table public.pm_block_rules add column if not exists created_by uuid references auth.users(id);
 alter table public.pm_block_rules add column if not exists created_at timestamp with time zone not null default now();
 alter table public.pm_block_rules add column if not exists updated_at timestamp with time zone not null default now();
@@ -185,17 +190,17 @@ create unique index if not exists uniq_pm_block_rules_advertiser_key on public.p
 create index if not exists idx_pm_block_rules_advertiser_key on public.pm_block_rules(advertiser_id, rule_key);
 create index if not exists idx_pm_block_rules_enabled on public.pm_block_rules(is_enabled);
 
-insert into public.pm_block_rules (advertiser_id, rule_key, rule_name, description, action, threshold, risk_delta, is_enabled)
-select a.id, rule.rule_key, rule.rule_name, rule.description, rule.action, rule.threshold, rule.risk_delta, rule.is_enabled
+insert into public.pm_block_rules (advertiser_id, rule_key, rule_name, description, action, threshold, risk_delta, is_enabled, auto_block_create)
+select a.id, rule.rule_key, rule.rule_name, rule.description, rule.action, rule.threshold, rule.risk_delta, rule.is_enabled, rule.auto_block_create
 from public.pm_advertisers a
 cross join (
   values
-    ('repeat_click_suspicious', '반복 클릭 의심', '같은 광고주와 IP 기준 10분 내 3회 이상 클릭 시 의심으로 판정합니다.', 'suspicious', 3, 0, true),
-    ('repeat_click_block', '반복 클릭 차단', '같은 광고주와 IP 기준 10분 내 5회 이상 클릭 시 차단으로 판정합니다.', 'blocked', 5, 0, true),
-    ('short_stay', '짧은 체류', '체류시간이 3초 이하이면 위험도를 가중합니다.', 'monitor', 3, 12, true),
-    ('no_page_move', '무이동 세션', '페이지 이동이 0회이면 위험도를 가중합니다.', 'monitor', 0, 10, true),
-    ('partner_media_watch', '제휴 매체 관찰', '제휴 매체 유입을 관찰 reason에 추가합니다.', 'monitor', null, 0, false)
-) as rule(rule_key, rule_name, description, action, threshold, risk_delta, is_enabled)
+    ('repeat_click_suspicious', '반복 클릭 의심', '같은 광고주와 IP 기준 10분 내 3회 이상 클릭 시 의심으로 판정합니다.', 'suspicious', 3, 0, true, false),
+    ('repeat_click_block', '반복 클릭 차단', '같은 광고주와 IP 기준 10분 내 5회 이상 클릭 시 차단 로그로 판정합니다.', 'blocked', 5, 0, true, false),
+    ('short_stay', '짧은 체류', '체류시간이 3초 이하이면 위험도를 가중합니다.', 'monitor', 3, 12, true, false),
+    ('no_page_move', '무이동 세션', '페이지 이동이 0회이면 위험도를 가중합니다.', 'monitor', 0, 10, true, false),
+    ('partner_media_watch', '제휴 매체 관찰', '제휴 매체 유입을 관찰 reason에 추가합니다.', 'monitor', null, 0, false, false)
+) as rule(rule_key, rule_name, description, action, threshold, risk_delta, is_enabled, auto_block_create)
 on conflict (advertiser_id, rule_key) do nothing;
 
 create table if not exists public.pm_conversion_events (

@@ -665,7 +665,9 @@ export async function fetchBlockRules() {
     action: rule.action,
     threshold: rule.threshold || null,
     riskDelta: 0,
-    isEnabled: rule.enabled !== false
+    isEnabled: rule.enabled !== false,
+    autoBlockCreate: false,
+    blockingEnabled: true
   })) };
 }
 
@@ -683,6 +685,17 @@ export async function updateBlockRule(rule, patch) {
     });
   }
   return { ok: true, rule: { ...rule, ...patch } };
+}
+
+export async function updateAdvertiserBlocking(advertiserId, blockingEnabled) {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    return apiRequest("/api/block-rules", {
+      method: "PATCH",
+      payload: { advertiser_id: advertiserId, blocking_enabled: blockingEnabled }
+    });
+  }
+  return { ok: true, advertiser: { id: advertiserId, blockingEnabled } };
 }
 
 function mapBlockedIpFromApi(item) {
@@ -744,6 +757,17 @@ export async function removeBlock(blockId) {
   const mode = ensureServiceMode();
   if (mode === "supabase") return apiRequest("/api/blocked-ips", { method: "PATCH", payload: { id: blockId } });
   return { ok: true, releasedBlockId: blockId, releasedAt: "2026-05-27 14:30" };
+}
+
+export async function updateClickLogStatus(logId, clickStatus, reason) {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    return apiRequest("/api/click-logs", {
+      method: "PATCH",
+      payload: { log_id: logId, click_status: clickStatus, reason }
+    });
+  }
+  return { ok: true, log: { id: logId, click_status: clickStatus, reason } };
 }
 
 export async function fetchAdvertisers() {

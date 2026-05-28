@@ -562,18 +562,35 @@ limit 50;
 
 규칙을 OFF로 변경하면 해당 조건은 판정에서 제외됩니다. 단, `pm_blocked_ips`에 활성 등록된 IP hash는 규칙 토글과 무관하게 항상 `blocked` 처리합니다.
 
+중요 개념:
+
+- `pm_click_logs.click_status='blocked'`는 로그 판정 상태입니다.
+- 실제 차단 여부는 `pm_blocked_ips.is_active=true` row가 있는지로 판단합니다.
+- 자동 규칙으로 `blocked` 판정이 나와도 `pm_blocked_ips`에 row가 없으면 해제할 차단 대상은 없습니다.
+- `pm_block_rules.auto_block_create=false`: blocked 로그만 생성합니다.
+- `pm_block_rules.auto_block_create=true`: blocked 판정 시 `pm_blocked_ips.block_type='auto'` row를 자동 생성합니다.
+
+긴급 자동 차단 중지:
+
+- 광고주별 `pm_advertisers.blocking_enabled=false`로 저장합니다.
+- 이 상태에서는 반복 클릭 자동 suspicious/blocked 판정을 올리지 않습니다.
+- 단, 이미 `pm_blocked_ips.is_active=true`인 수동/자동 활성 차단 IP는 계속 강제 blocked 처리됩니다.
+- 차단 관리의 `자동 판정 규칙` 화면에서 광고주별 긴급 중지/재개 버튼을 사용할 수 있습니다.
+
 수동 차단은 `pm_blocked_ips`에 저장됩니다.
 
 - 로그 기반 차단: 후보 로그의 `log_id`를 서버로 보내고, 서버가 `pm_click_logs.ip_hash`, `ip_masked`를 사용해 저장합니다.
 - 직접 입력 차단: 사용자가 입력한 `raw_ip`를 서버 API가 `IP_HASH_SALT`로 hash 처리하고, DB에는 `ip_hash`, `ip_masked`만 저장합니다.
 - 차단 해제: 실제 삭제하지 않고 `is_active=false`, `released_at=now()`로 soft release 처리합니다.
+- 로그 상태 정정: `PATCH /api/click-logs`로 `pm_click_logs.click_status`를 `normal/suspicious/blocked` 중 하나로 수정합니다. 이것은 실제 차단 해제가 아니라 로그 판정 정정입니다.
 
 IP 원문은 DB에 저장하지 않습니다. `IP_HASH_SALT`는 서버 환경변수로만 등록해야 하며 `NEXT_PUBLIC_` 접두어를 붙이면 안 됩니다.
 
 자동 차단 규칙 확인 SQL:
 
 ```sql
-select a.name, r.rule_key, r.rule_name, r.action, r.threshold, r.risk_delta, r.is_enabled, r.updated_at
+select a.name, a.blocking_enabled, r.rule_key, r.rule_name, r.action, r.threshold,
+       r.risk_delta, r.is_enabled, r.auto_block_create, r.updated_at
 from public.pm_block_rules r
 join public.pm_advertisers a on a.id = r.advertiser_id
 order by a.name, r.rule_key;
@@ -593,10 +610,14 @@ limit 50;
 
 1. 자동 차단 규칙에서 `repeat_click_suspicious`를 OFF로 변경한 뒤 같은 IP로 3회 수집해도 `suspicious`가 되지 않는지 확인합니다.
 2. 다시 ON으로 변경한 뒤 3회 수집 시 `suspicious`, 5회 수집 시 `blocked`가 반환되는지 확인합니다.
-3. 후보 로그에서 차단 등록을 눌러 `pm_blocked_ips`에 row가 생성되는지 확인합니다.
-4. 직접 IP 입력 차단 시 DB에 raw IP가 없고 `ip_hash`, `ip_masked`만 저장되는지 확인합니다.
-5. 차단 해제 시 `is_active=false`, `released_at`이 저장되는지 확인합니다.
-6. 활성 차단된 `ip_hash`로 다시 `/api/collect` 호출 시 `blocked` 처리되는지 확인합니다.
+3. `repeat_click_block.auto_block_create=false`이면 blocked 로그만 생성되고 `pm_blocked_ips`에는 자동 row가 생기지 않는지 확인합니다.
+4. `repeat_click_block.auto_block_create=true`이면 blocked 판정 시 `pm_blocked_ips.block_type='auto'` row가 생성되는지 확인합니다.
+5. 후보 로그에서 실제 차단 등록을 눌러 `pm_blocked_ips`에 row가 생성되는지 확인합니다.
+6. 직접 IP 입력 차단 시 DB에 raw IP가 없고 `ip_hash`, `ip_masked`만 저장되는지 확인합니다.
+7. 활성 차단 IP 화면에서 차단 해제 시 `is_active=false`, `released_at`이 저장되는지 확인합니다.
+8. blocked 판정 로그를 suspicious/normal로 정정할 수 있는지 확인합니다.
+9. 긴급 자동 차단 중지 후 반복 클릭이 자동 blocked/suspicious로 올라가지 않는지 확인합니다.
+10. 활성 차단된 `ip_hash`로 다시 `/api/collect` 호출 시 blocked 처리되는지 확인합니다.
 
 ## 광고주 리포트 / CSV / 인쇄
 

@@ -24,7 +24,9 @@ import {
   signInWithEmail,
   signOut,
   signUpMarketerAccount,
+  updateAdvertiserBlocking,
   updateBlockRule,
+  updateClickLogStatus,
   updateAdvertiserUserPermission
 } from "@/services/clickService";
 
@@ -207,6 +209,29 @@ export function AppStateProvider({ children }) {
     return result;
   }
 
+  async function handleUpdateAdvertiserBlocking(advertiserId, blockingEnabled) {
+    const previous = blockRules;
+    setBlockRules((prev) => prev.map((item) => item.advertiserId === advertiserId ? { ...item, blockingEnabled } : item));
+    const result = await updateAdvertiserBlocking(advertiserId, blockingEnabled);
+    if (!result.ok) {
+      setBlockRules(previous);
+      setDataError(result.error || "긴급 자동 차단 중지 설정에 실패했습니다.");
+      return result;
+    }
+    await refreshAccess();
+    return result;
+  }
+
+  async function handleUpdateClickLogStatus(logId, clickStatus, reason) {
+    const result = await updateClickLogStatus(logId, clickStatus, reason);
+    if (!result.ok) {
+      setDataError(result.error || "로그 상태 정정에 실패했습니다.");
+      return result;
+    }
+    await refreshAccess();
+    return result;
+  }
+
   async function handleAssign(marketerId, advertiserId) {
     await assignAdvertiserToMarketer(marketerId, advertiserId);
     await refreshAccess();
@@ -286,6 +311,8 @@ export function AppStateProvider({ children }) {
     addManualBlock,
     removeManualBlock,
     handleUpdateBlockRule,
+    handleUpdateAdvertiserBlocking,
+    handleUpdateClickLogStatus,
     handleAssign,
     handleRemoveAssignment,
     handleCreateAdvertiser,

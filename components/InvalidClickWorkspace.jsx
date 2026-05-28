@@ -10,7 +10,7 @@ import { useAppState } from "@/components/AppStateProvider";
 const pageMeta = {
   "ad-click-ip": ["광고 클릭 IP", "UTM, referrer, 키워드가 있는 광고 유입 로그를 IP 단위로 확인합니다."],
   "suspicious-ip": ["의심 클릭 IP", "click_status가 suspicious인 로그를 중심으로 의심 사유를 확인합니다."],
-  "blocked-ip": ["차단된 IP", "blocked 로그와 활성 차단 IP를 함께 확인합니다."],
+  "blocked-ip": ["차단 판정 로그", "click_status가 blocked인 판정 로그를 확인합니다. 실제 해제 대상은 차단 관리의 활성 차단 IP입니다."],
   "repeated-ip": ["반복 클릭 IP", "recent_count와 ip_masked 기준으로 반복 클릭 패턴을 정렬합니다."],
   "exposure-limited-ip": ["노출제한 IP", "매체 연동 전 단계의 차단/노출제한 후보를 관리합니다."]
 };
