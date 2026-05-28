@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Building2, CheckCircle2, Code2, UsersRound } from "lucide-react";
 import AdvertiserCreatePanel from "@/components/AdvertiserCreatePanel";
@@ -13,8 +13,8 @@ import { useAppState } from "@/components/AppStateProvider";
 
 const tabs = [
   { id: "list", label: "광고주 목록" },
-  { id: "create", label: "광고주 생성" },
-  { id: "users", label: "광고주 계정 관리" },
+  { id: "create", label: "광고주/사이트 등록" },
+  { id: "users", label: "광고주 로그인 계정 발급" },
   { id: "scripts", label: "설치 스크립트" }
 ];
 
@@ -32,6 +32,7 @@ export default function AdvertisersWorkspace() {
   } = useAppState();
   const initialTab = tabs.some((tab) => tab.id === searchParams.get("tab")) ? searchParams.get("tab") : "list";
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [selectedAdvertiserForUser, setSelectedAdvertiserForUser] = useState("");
   const advertisers = user.role === "admin" ? allAdvertisers : myAdvertisers;
 
   const summary = useMemo(() => {
@@ -42,12 +43,21 @@ export default function AdvertisersWorkspace() {
     return { total: advertisers.length, active, installed, users };
   }, [advertiserUsers, advertisers]);
 
+  const openIssueAccount = useCallback((advertiserId) => {
+    setSelectedAdvertiserForUser(advertiserId);
+    setActiveTab("users");
+  }, []);
+
+  const clearSelectedAdvertiserForUser = useCallback(() => {
+    setSelectedAdvertiserForUser("");
+  }, []);
+
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard icon={Building2} label="내 광고주 수" value={summary.total} />
         <SummaryCard icon={CheckCircle2} label="활성 광고주 수" value={summary.active} />
-        <SummaryCard icon={Code2} label="설치 완료 수" value={summary.installed} />
+        <SummaryCard icon={Code2} label="설치 가능 수" value={summary.installed} />
         <SummaryCard icon={UsersRound} label="광고주 계정 수" value={summary.users} />
       </div>
 
@@ -68,12 +78,20 @@ export default function AdvertisersWorkspace() {
       </Card>
 
       {user.role === "marketer" && advertisers.length === 0 && activeTab !== "create" && <EmptyAdvertiserState compact />}
-      {activeTab === "list" && <AdvertiserList advertisers={advertisers} />}
+      {activeTab === "list" && (
+        <AdvertiserList
+          advertisers={advertisers}
+          advertiserUsers={advertiserUsers}
+          onIssueAccount={openIssueAccount}
+        />
+      )}
       {activeTab === "create" && <AdvertiserCreatePanel currentUser={user} onCreateAdvertiser={handleCreateAdvertiser} />}
       {activeTab === "users" && (
         <AdvertiserUserManagement
           advertiserUsers={advertiserUsers}
           advertisers={advertisers}
+          selectedAdvertiserId={selectedAdvertiserForUser}
+          onSelectedAdvertiserHandled={clearSelectedAdvertiserForUser}
           onCreateUser={handleCreateAdvertiserUser}
           onUpdatePermission={handleUpdateAdvertiserUserPermission}
           onDeactivateUser={handleDeactivateAdvertiserUser}
@@ -96,34 +114,65 @@ function SummaryCard({ icon: Icon, label, value }) {
   );
 }
 
-function AdvertiserList({ advertisers }) {
+function AdvertiserList({ advertisers, advertiserUsers, onIssueAccount }) {
+  const accountCountByAdvertiser = useMemo(() => {
+    const counts = new Map();
+    advertiserUsers.forEach((user) => {
+      counts.set(user.advertiserId, (counts.get(user.advertiserId) || 0) + 1);
+    });
+    return counts;
+  }, [advertiserUsers]);
+
   return (
     <Card>
       <div className="border-b border-line px-5 py-4">
         <h2 className="text-base font-bold text-white">광고주 목록</h2>
-        <p className="mt-1 text-sm text-slate-500">현재 계정 권한으로 접근 가능한 광고주입니다.</p>
+        <p className="mt-1 text-sm text-slate-500">현재 계정 권한으로 접근 가능한 광고주와 계정 발급 상태입니다.</p>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
+        <table className="w-full min-w-[1080px] text-left text-sm">
           <thead className="bg-panelSoft text-xs uppercase text-slate-500">
             <tr>
-              {["광고주", "사이트 URL", "client_id", "project_key", "상태"].map((head) => (
+              {["광고주명", "사이트 URL", "client_id", "project_key", "상태", "로그인 계정 수", "설치 스크립트 상태"].map((head) => (
                 <th key={head} className="px-5 py-3 font-semibold">{head}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {advertisers.map((advertiser) => (
-              <tr key={advertiser.id} className="hover:bg-panelSoft/50">
-                <td className="px-5 py-4 font-semibold text-white">{advertiser.name}</td>
-                <td className="px-5 py-4 text-slate-400">{advertiser.siteUrl}</td>
-                <td className="px-5 py-4 font-mono text-xs text-slate-300">{advertiser.clientId}</td>
-                <td className="px-5 py-4 font-mono text-xs text-slate-300">{advertiser.projectKey}</td>
-                <td className="px-5 py-4">
-                  <StatusBadge status={advertiser.status === "active" ? "정상" : "설치 전"} label={advertiser.status} />
-                </td>
-              </tr>
-            ))}
+            {advertisers.map((advertiser) => {
+              const accountCount = accountCountByAdvertiser.get(advertiser.id) || 0;
+              const canInstall = Boolean(advertiser.clientId && advertiser.projectKey);
+              return (
+                <tr key={advertiser.id} className="hover:bg-panelSoft/50">
+                  <td className="px-5 py-4 font-semibold text-white">{advertiser.name}</td>
+                  <td className="px-5 py-4 text-slate-400">{advertiser.siteUrl}</td>
+                  <td className="px-5 py-4 font-mono text-xs text-slate-300">{advertiser.clientId}</td>
+                  <td className="px-5 py-4 font-mono text-xs text-slate-300">{advertiser.projectKey}</td>
+                  <td className="px-5 py-4">
+                    <StatusBadge status={advertiser.status === "active" ? "정상" : "차단"} label={advertiser.status} />
+                  </td>
+                  <td className="px-5 py-4">
+                    {accountCount > 0 ? (
+                      <StatusBadge status="정상" label={`${accountCount}개 발급`} />
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge status="의심" label="계정 미발급" />
+                        <button
+                          type="button"
+                          onClick={() => onIssueAccount(advertiser.id)}
+                          className="rounded border border-line bg-panelSoft px-2 py-1 text-xs font-semibold text-slate-300 transition hover:border-brand hover:text-brand"
+                        >
+                          계정 발급
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-5 py-4">
+                    <StatusBadge status={canInstall ? "정상" : "의심"} label={canInstall ? "발급 완료" : "발급 필요"} />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {advertisers.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-500">관리 중인 광고주가 없습니다.</div>}

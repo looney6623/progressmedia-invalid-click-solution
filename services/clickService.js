@@ -451,10 +451,6 @@ export async function createAdvertiserWithAccount(payload, currentUser) {
     return apiPost("/api/advertisers", {
       advertiserName: payload.name,
       siteUrl: payload.siteUrl,
-      contactName: payload.contactName,
-      advertiserEmail: payload.loginEmail,
-      temporaryPassword: payload.temporaryPassword,
-      permission: payload.permission,
       status: payload.status
     });
   }
@@ -463,30 +459,15 @@ export async function createAdvertiserWithAccount(payload, currentUser) {
   const clientId = `pm-${slugify(payload.name)}-${String(advertiserSequence).padStart(3, "0")}`;
   const projectKey = generateProjectKey(payload.name);
   const advertiserId = `adv_${String(advertiserSequence).padStart(3, "0")}`;
-  const advertiserUserId = `user_client_${String(advertiserSequence).padStart(3, "0")}`;
-  const advertiserUserLinkId = `adu_${String(advertiserUserSequence++).padStart(3, "0")}`;
   advertiserSequence += 1;
 
   const advertiser = { id: advertiserId, name: payload.name, clientId, projectKey, siteUrl: payload.siteUrl, status: payload.status, createdBy: currentUser.id };
-  const advertiserUser = { id: advertiserUserId, email: payload.loginEmail, name: payload.contactName, role: "advertiser", team: payload.name, isActive: payload.status === "active" };
-  const advertiserUserLink = {
-    id: advertiserUserLinkId,
-    userId: advertiserUserId,
-    advertiserId,
-    permission: payload.permission,
-    createdBy: currentUser.id,
-    isActive: true,
-    inviteLink: `https://app.progressmedia.example/invite/${advertiserUserLinkId}`,
-    temporaryPassword: payload.temporaryPassword || "Temp!2026"
-  };
   const assignment = { id: `asg_mock_${assignmentSequence++}`, marketerId: currentUser.id, advertiserId, permission: "manage", assignedAt: "2026-05-27 09:00" };
 
   mockAdvertisers = [advertiser, ...mockAdvertisers];
-  mockUsers = [advertiserUser, ...mockUsers];
-  mockAdvertiserUsers = [advertiserUserLink, ...mockAdvertiserUsers];
   mockAssignments = [assignment, ...mockAssignments];
 
-  return { ok: true, advertiser, advertiserUser, advertiserUserLink, assignment, installScript: generateInstallScript(clientId, projectKey) };
+  return { ok: true, advertiser, assignment, installScript: generateInstallScript(clientId, projectKey) };
 }
 
 export async function fetchAdvertiserUsers(user) {
@@ -528,7 +509,16 @@ export async function fetchAdvertiserUsers(user) {
 
 export async function createAdvertiserUser(payload, currentUser) {
   const mode = ensureServiceMode();
-  if (mode === "supabase") return apiPost("/api/advertiser-users", { ...payload, createdBy: currentUser.id });
+  if (mode === "supabase") {
+    return apiPost("/api/advertiser-users", {
+      advertiserId: payload.advertiserId,
+      name: payload.name,
+      email: payload.email,
+      temporaryPassword: payload.temporaryPassword,
+      permission: payload.permission,
+      status: payload.status || "active"
+    });
+  }
   if (mode === "unavailable") return serviceUnavailable();
 
   const id = `adu_${String(advertiserUserSequence++).padStart(3, "0")}`;
@@ -538,6 +528,7 @@ export async function createAdvertiserUser(payload, currentUser) {
     id,
     userId,
     advertiserId: payload.advertiserId,
+    advertiserName: payload.advertiserName,
     permission: payload.permission,
     createdBy: currentUser.id,
     isActive: true,

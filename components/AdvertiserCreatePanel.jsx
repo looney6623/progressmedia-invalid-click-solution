@@ -2,16 +2,23 @@ import { useState } from "react";
 import { Building2, Copy, KeyRound, Loader2, Plus } from "lucide-react";
 import { Card, SectionDescription, SectionTitle, StatusBadge } from "@/components/ui";
 
+const emptyForm = {
+  name: "",
+  siteUrl: "",
+  status: "active"
+};
+
+function isValidUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
 export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser }) {
-  const [form, setForm] = useState({
-    name: "",
-    siteUrl: "",
-    contactName: "",
-    loginEmail: "",
-    temporaryPassword: "",
-    permission: "manage",
-    status: "active"
-  });
+  const [form, setForm] = useState(emptyForm);
   const [created, setCreated] = useState(null);
   const [copied, setCopied] = useState("");
   const [error, setError] = useState("");
@@ -24,28 +31,35 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
   async function submit(event) {
     event.preventDefault();
     if (loading) return;
+
+    const payload = {
+      name: form.name.trim(),
+      siteUrl: form.siteUrl.trim(),
+      status: form.status
+    };
+
+    if (!payload.name) {
+      setError("광고주명을 입력해 주세요.");
+      return;
+    }
+    if (!payload.siteUrl || !isValidUrl(payload.siteUrl)) {
+      setError("https:// 로 시작하는 올바른 사이트 URL을 입력해 주세요.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setCreated(null);
 
-    const requestedEmail = form.loginEmail.trim().toLowerCase();
-    const result = await onCreateAdvertiser({ ...form, loginEmail: requestedEmail }, currentUser);
-
+    const result = await onCreateAdvertiser(payload, currentUser);
     if (!result.ok) {
-      setError(result.error || "광고주 생성에 실패했습니다.");
-      setLoading(false);
-      return;
-    }
-
-    const issuedEmail = result.advertiserUser?.email?.trim().toLowerCase();
-    if (issuedEmail && issuedEmail !== requestedEmail) {
-      setError("발급된 광고주 이메일이 입력한 이메일과 일치하지 않습니다.");
+      setError(result.error || "광고주/사이트 등록에 실패했습니다.");
       setLoading(false);
       return;
     }
 
     setCreated(result);
-    setForm({ name: "", siteUrl: "", contactName: "", loginEmail: "", temporaryPassword: "", permission: "manage", status: "active" });
+    setForm(emptyForm);
     setLoading(false);
   }
 
@@ -62,52 +76,52 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
 
   return (
     <Card id="advertiser-create" className="scroll-mt-24">
-      <SectionTitle icon={Building2} title="광고주 생성" />
+      <SectionTitle icon={Building2} title="광고주/사이트 등록" />
       <SectionDescription>
-        광고주와 로그인 계정을 함께 발급합니다. 운영 환경에서는 서버 API Route가 Supabase Auth Admin API로 광고주 계정을 생성합니다.
+        광고주 기본 정보와 사이트 URL을 등록하고 추적용 client_id, project_key를 발급합니다. 로그인 계정은 다음 단계에서 별도로 발급합니다.
       </SectionDescription>
       {error && <div className="mx-5 mt-4 rounded-md border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
       <div className="grid gap-5 p-5 xl:grid-cols-[0.9fr_1.1fr]">
         <form onSubmit={submit} className="space-y-3">
-          {[
-            ["name", "광고주명", "예: 샤브20", "text"],
-            ["siteUrl", "사이트 URL", "https://example.com", "url"],
-            ["contactName", "광고주 담당자명", "홍길동", "text"],
-            ["loginEmail", "광고주 로그인 이메일", "client@example.com", "email"],
-            ["temporaryPassword", "임시 비밀번호", "광고주에게 전달할 임시 비밀번호", "password"]
-          ].map(([key, label, placeholder, type]) => (
-            <label key={key} className="block">
-              <span className="text-xs font-semibold text-slate-500">{label}</span>
-              <input
-                type={type}
-                value={form[key]}
-                onChange={(event) => updateField(key, event.target.value)}
-                required
-                disabled={loading}
-                className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100 outline-none focus:border-brand disabled:opacity-60"
-                placeholder={placeholder}
-              />
-            </label>
-          ))}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-500">권한</span>
-              <select disabled={loading} value={form.permission} onChange={(event) => updateField("permission", event.target.value)} className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100 disabled:opacity-60">
-                <option value="manage">manage</option>
-                <option value="view">view</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-500">상태</span>
-              <select disabled={loading} value={form.status} onChange={(event) => updateField("status", event.target.value)} className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100 disabled:opacity-60">
-                <option value="active">active</option>
-                <option value="inactive">inactive</option>
-              </select>
-            </label>
-          </div>
-          <button disabled={loading} className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-ink disabled:cursor-not-allowed disabled:opacity-60">
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-500">광고주명</span>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              required
+              disabled={loading}
+              className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100 outline-none focus:border-brand disabled:opacity-60"
+              placeholder="예: 샤브20"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-500">사이트 URL</span>
+            <input
+              type="url"
+              value={form.siteUrl}
+              onChange={(event) => updateField("siteUrl", event.target.value)}
+              required
+              disabled={loading}
+              className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100 outline-none focus:border-brand disabled:opacity-60"
+              placeholder="https://example.com"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-500">상태</span>
+            <select
+              disabled={loading}
+              value={form.status}
+              onChange={(event) => updateField("status", event.target.value)}
+              className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100 outline-none focus:border-brand disabled:opacity-60"
+            >
+              <option value="active">active</option>
+              <option value="inactive">inactive</option>
+            </select>
+          </label>
+          <button disabled={loading} className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-ink transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60">
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-            {loading ? "생성 중" : "광고주 생성"}
+            {loading ? "등록 중" : "광고주/사이트 등록"}
           </button>
         </form>
 
@@ -119,21 +133,27 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
           {created ? (
             <div className="space-y-3">
               <div className="grid gap-2 sm:grid-cols-2">
-                <Info label="광고주" value={created.advertiser.name} />
-                <Info label="광고주 계정" value={created.advertiserUser.email} />
+                <Info label="광고주명" value={created.advertiser.name} />
+                <Info label="사이트 URL" value={created.advertiser.siteUrl} />
                 <Info label="client_id" value={created.advertiser.clientId} onCopy={() => copyText("client_id", created.advertiser.clientId)} />
                 <Info label="project_key" value={created.advertiser.projectKey} onCopy={() => copyText("project_key", created.advertiser.projectKey)} />
-                <Info label="임시 비밀번호" value={created.advertiserUserLink?.temporaryPassword || "-"} onCopy={() => copyText("password", created.advertiserUserLink?.temporaryPassword)} />
               </div>
               <pre className="max-h-44 overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-300">{created.installScript}</pre>
-              <button onClick={() => copyText("script", created.installScript)} className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-ink px-3 text-xs font-semibold text-slate-300">
-                <Copy size={14} />
-                설치 스크립트 복사
-              </button>
-              {copied && <StatusBadge status="정상" label={`${copied} 복사 완료`} />}
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={() => copyText("script", created.installScript)} className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-ink px-3 text-xs font-semibold text-slate-300 transition hover:border-brand hover:text-brand">
+                  <Copy size={14} />
+                  설치 스크립트 복사
+                </button>
+                {copied && <StatusBadge status="정상" label={`${copied} 복사 완료`} />}
+              </div>
+              <p className="rounded-md border border-brand/20 bg-brand/10 px-3 py-2 text-xs leading-5 text-brand">
+                광고주 로그인 계정은 [광고주 로그인 계정 발급] 탭에서 별도로 생성합니다.
+              </p>
             </div>
           ) : (
-            <p className="text-sm leading-6 text-slate-500">모든 생성 단계가 성공하면 이번에 발급된 광고주 정보만 표시됩니다.</p>
+            <p className="text-sm leading-6 text-slate-500">
+              등록이 완료되면 이번 광고주의 추적 키와 설치 스크립트가 표시됩니다. 이 단계에서는 광고주 로그인 계정을 만들지 않습니다.
+            </p>
           )}
         </div>
       </div>
@@ -146,9 +166,9 @@ function Info({ label, value, onCopy }) {
     <div className="rounded-md bg-ink p-3">
       <p className="text-xs text-slate-500">{label}</p>
       <div className="mt-1 flex items-center justify-between gap-2">
-        <p className="truncate text-sm font-semibold text-white">{value}</p>
+        <p className="truncate text-sm font-semibold text-white">{value || "-"}</p>
         {onCopy && (
-          <button onClick={onCopy} className="shrink-0 text-slate-500 hover:text-brand">
+          <button onClick={onCopy} className="shrink-0 text-slate-500 transition hover:text-brand" type="button">
             <Copy size={14} />
           </button>
         )}

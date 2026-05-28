@@ -51,7 +51,7 @@ IP_HASH_SALT=change-me
 4. Cloudtype 환경변수 등록
 5. `PM_PROJECT_ENV=cloudtype` 설정
 6. 마케터 회원가입 및 로그인 테스트
-7. 광고주 생성, 광고주 계정 생성, 설치 스크립트 발급 테스트
+7. 광고주/사이트 등록, 광고주 로그인 계정 발급, 설치 스크립트 발급 테스트
 
 ## 계정 생성 흐름
 
@@ -63,37 +63,59 @@ IP_HASH_SALT=change-me
 
 ## 광고주 관리
 
-`/advertisers` 페이지는 아래 탭을 통합합니다.
+`/advertisers` 페이지는 광고주 운영 흐름을 3단계로 분리합니다.
 
 - 광고주 목록
-- 광고주 생성
-- 광고주 계정 관리
+- 광고주/사이트 등록
+- 광고주 로그인 계정 발급
 - 설치 스크립트
 
-광고주 생성 필수값:
+광고주/사이트 등록 필수값:
 
 - 광고주명
 - 사이트 URL
-- 광고주 담당자명
-- 광고주 로그인 이메일
+- 상태 `active/inactive`
+
+광고주/사이트 등록 시 `client_id`, `project_key`를 자동 발급하고 `pm_advertisers`, `pm_marketer_advertisers` 저장 구조를 사용합니다. 이 단계에서는 Supabase Auth 광고주 로그인 계정을 만들지 않습니다.
+
+광고주 로그인 계정 발급 필수값:
+
+- 광고주 선택
+- 담당자명
+- 로그인 이메일
 - 임시 비밀번호
+- 권한 `view/manage`
+- 상태 `active`
 
-생성 시 `client_id`, `project_key`를 자동 발급하고 `pm_advertisers`, `pm_marketer_advertisers` 저장 구조를 사용합니다. 광고주 Auth 계정 생성처럼 service role key가 필요한 작업은 클라이언트가 아니라 API Route에서 처리합니다.
+광고주 Auth 계정 생성처럼 service role key가 필요한 작업은 클라이언트가 아니라 `POST /api/advertiser-users` 서버 API Route에서 처리합니다. `@my-progress.co.kr`은 내부 마케터 계정용이므로 광고주 로그인 이메일에는 사용하지 않습니다.
 
-## 광고주 생성 플로우
+광고주 목록에서는 광고주별 로그인 계정 수를 표시합니다. 계정 수가 0이면 `계정 미발급` 배지를 표시하고, `계정 발급` 버튼으로 해당 광고주가 선택된 계정 발급 탭으로 이동합니다.
 
-마케터가 광고주 생성 버튼을 클릭하면 `POST /api/advertisers` 서버 API Route가 아래 작업을 처리합니다.
+## 광고주/사이트 등록 플로우
+
+마케터가 광고주/사이트 등록 버튼을 클릭하면 `POST /api/advertisers` 서버 API Route가 아래 작업을 처리합니다.
 
 1. 현재 로그인 사용자의 Supabase session 확인
 2. `pm_profiles.role`이 `marketer` 또는 `admin`인지 확인
 3. `pm_advertisers`에 광고주 생성
 4. 현재 로그인 사용자와 `pm_marketer_advertisers` 연결
-5. Supabase Auth Admin API로 광고주 이메일 계정 생성
-6. `pm_profiles`에 `role='advertiser'` profile upsert
-7. `pm_advertiser_users`에 광고주 계정과 `advertiser_id` 연결
-8. 모든 단계 성공 시 `client_id`, `project_key`, 설치 스크립트, 광고주 로그인 정보 반환
+5. `client_id`, `project_key`, 설치 스크립트 반환
 
-이미 같은 광고주 이메일의 Auth user가 있으면 기존 사용자를 조회합니다. 기존 role이 `advertiser`이면 profile/link를 보강하고, 기존 role이 `marketer` 또는 `admin`이면 충돌 오류를 반환합니다.
+이 단계는 광고주 데이터와 추적 키를 만드는 단계입니다. 광고주 로그인 계정은 별도의 `광고주 로그인 계정 발급` 탭에서 생성합니다.
+
+## 광고주 로그인 계정 발급 플로우
+
+마케터가 광고주 로그인 계정 발급 버튼을 클릭하면 `POST /api/advertiser-users` 서버 API Route가 아래 작업을 처리합니다.
+
+1. 현재 로그인 사용자의 Supabase session 확인
+2. `pm_profiles.role`이 `marketer` 또는 `admin`인지 확인
+3. 선택한 광고주가 현재 마케터 담당 광고주인지 확인
+4. Supabase Auth Admin API로 광고주 이메일 계정 생성 또는 기존 advertiser 계정 확인
+5. `pm_profiles`에 `role='advertiser'` profile upsert
+6. `pm_advertiser_users`에 광고주 계정과 `advertiser_id` 연결
+7. 발급된 광고주명, 로그인 이메일, 권한, 상태를 반환
+
+이미 같은 광고주 이메일의 Auth user가 있으면 기존 사용자를 조회합니다. 기존 role이 `advertiser`이면 profile/link를 보강하고, 기존 role이 `marketer` 또는 `admin`이면 충돌 오류를 반환합니다. 광고주 직접 가입 화면은 제공하지 않습니다.
 
 광고주 Auth 계정 생성은 반드시 서버 API Route에서만 처리합니다. `SUPABASE_SERVICE_ROLE_KEY`는 클라이언트 컴포넌트나 브라우저 번들에서 사용하지 않습니다.
 
@@ -119,8 +141,8 @@ API가 `DB_ROLE_CONSTRAINT_MISMATCH`를 반환하면 위 SQL을 Supabase SQL Edi
 
 상용화를 위한 서버 API 뼈대를 추가했습니다.
 
-- `POST /api/advertisers`: 광고주 생성, 마케터 연결, 설치 스크립트 발급 준비
-- `POST /api/advertiser-users`: 광고주 Auth 계정 생성과 `pm_advertiser_users` 연결 준비
+- `POST /api/advertisers`: 광고주/사이트 등록, 마케터 연결, 추적 키와 설치 스크립트 발급
+- `POST /api/advertiser-users`: 광고주 Auth 계정 생성과 `pm_advertiser_users` 연결
 - `POST /api/collect`: 추적 스크립트 클릭/방문 수집 준비
 - `POST /api/events`: 체류시간, 전환 이벤트 수집 준비
 
@@ -492,16 +514,38 @@ order by au.created_at desc
 limit 10;
 ```
 
+광고주 로그인 계정 확인 SQL:
+
+```sql
+select
+  au.id,
+  a.name as advertiser_name,
+  p.email as advertiser_email,
+  p.name as contact_name,
+  p.role,
+  au.permission,
+  p.is_active,
+  au.created_at
+from public.pm_advertiser_users au
+join public.pm_profiles p on p.id = au.user_id
+join public.pm_advertisers a on a.id = au.advertiser_id
+order by au.created_at desc
+limit 20;
+```
+
 광고주 로그인 QA:
 
 1. 마케터로 로그인
-2. `/advertisers`에서 광고주명, 사이트 URL, 담당자명, 광고주 이메일, 임시 비밀번호 입력
-3. 광고주 생성 클릭
-4. Supabase Auth Users에 광고주 이메일 생성 확인
-5. 위 SQL로 `pm_advertisers`, `pm_marketer_advertisers`, `pm_profiles`, `pm_advertiser_users` 확인
-6. 로그아웃 후 광고주 이메일/임시 비밀번호로 로그인
-7. 광고주 계정에서 본인 광고주만 보이는지 확인
-8. 설치 스크립트의 `data-client-id`, `data-project-key`가 DB 값과 일치하는지 확인
+2. `/advertisers`의 `광고주/사이트 등록` 탭에서 광고주명, 사이트 URL, 상태 입력
+3. 광고주/사이트 등록 클릭
+4. 광고주 목록에서 `계정 미발급` 배지와 `계정 발급` 버튼 확인
+5. `광고주 로그인 계정 발급` 탭에서 광고주 선택, 담당자명, 외부 이메일, 임시 비밀번호 입력
+6. 광고주 계정 발급 클릭
+7. Supabase Auth Users에 광고주 이메일 생성 확인
+8. 위 SQL로 `pm_advertisers`, `pm_marketer_advertisers`, `pm_profiles`, `pm_advertiser_users` 확인
+9. 로그아웃 후 광고주 이메일/임시 비밀번호로 로그인
+10. 광고주 계정에서 본인 광고주만 보이는지 확인
+11. 설치 스크립트의 `data-client-id`, `data-project-key`가 DB 값과 일치하는지 확인
 
 ## 개인정보/로그 정책
 
