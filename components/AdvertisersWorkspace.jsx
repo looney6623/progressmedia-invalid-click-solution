@@ -18,7 +18,7 @@ const tabs = [
   { id: "scripts", label: "설치 스크립트" }
 ];
 
-export default function AdvertisersWorkspace() {
+export default function AdvertisersWorkspace({ defaultTab }) {
   const searchParams = useSearchParams();
   const {
     user,
@@ -30,7 +30,8 @@ export default function AdvertisersWorkspace() {
     handleUpdateAdvertiserUserPermission,
     handleDeactivateAdvertiserUser
   } = useAppState();
-  const initialTab = tabs.some((tab) => tab.id === searchParams.get("tab")) ? searchParams.get("tab") : "list";
+  const requestedTab = searchParams.get("tab") || defaultTab;
+  const initialTab = tabs.some((tab) => tab.id === requestedTab) ? requestedTab : "list";
   const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedAdvertiserForUser, setSelectedAdvertiserForUser] = useState("");
   const advertisers = user.role === "admin" ? allAdvertisers : myAdvertisers;

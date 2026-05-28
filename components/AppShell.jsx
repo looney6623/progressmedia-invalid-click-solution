@@ -12,12 +12,46 @@ import { useAppState } from "@/components/AppStateProvider";
 const routeRoles = {
   "/dashboard": ["admin", "marketer", "advertiser"],
   "/advertisers": ["admin", "marketer"],
-  "/logs": ["admin", "marketer", "advertiser"],
-  "/analysis": ["admin", "marketer"],
+  "/advertisers/create": ["admin", "marketer"],
+  "/advertisers/accounts": ["admin", "marketer"],
+  "/advertisers/scripts": ["admin", "marketer"],
+  "/visitors/realtime": ["admin", "marketer", "advertiser"],
+  "/visitors/logs": ["admin", "marketer", "advertiser"],
+  "/visitors/pages": ["admin", "marketer"],
+  "/invalid-clicks/ad-click-ip": ["admin", "marketer", "advertiser"],
+  "/invalid-clicks/suspicious-ip": ["admin", "marketer", "advertiser"],
+  "/invalid-clicks/blocked-ip": ["admin", "marketer", "advertiser"],
+  "/invalid-clicks/repeated-ip": ["admin", "marketer"],
+  "/invalid-clicks/exposure-limited-ip": ["admin", "marketer"],
   "/blocks": ["admin", "marketer", "advertiser"],
+  "/blocks/rules": ["admin", "marketer"],
+  "/blocks/manual": ["admin", "marketer", "advertiser"],
+  "/blocks/history": ["admin", "marketer"],
+  "/conversions/events": ["admin", "marketer", "advertiser"],
+  "/conversions/logs": ["admin", "marketer"],
+  "/conversions/savings": ["admin", "marketer"],
+  "/logs": ["admin", "marketer"],
+  "/logs/all": ["admin", "marketer"],
+  "/logs/referrers": ["admin", "marketer"],
+  "/logs/utm": ["admin", "marketer"],
+  "/logs/keywords": ["admin", "marketer"],
+  "/analysis": ["admin", "marketer"],
   "/reports": ["admin", "marketer", "advertiser"],
+  "/reports/advertisers": ["admin", "marketer", "advertiser"],
+  "/reports/export": ["admin", "marketer"],
+  "/reports/print": ["admin", "marketer"],
+  "/settings/account": ["admin", "marketer", "advertiser"],
+  "/settings/policy": ["admin", "marketer"],
   "/account": ["admin", "marketer", "advertiser"]
 };
+
+function allowedRolesForPath(pathname) {
+  if (routeRoles[pathname]) return routeRoles[pathname];
+  const matched = Object.keys(routeRoles)
+    .filter((route) => pathname.startsWith(`${route}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  return routeRoles[matched] || routeRoles["/dashboard"];
+}
 
 export default function AppShell({ title, description, actions, children }) {
   const router = useRouter();
@@ -46,7 +80,7 @@ export default function AppShell({ title, description, actions, children }) {
     return <LoginPage onSignIn={handleSignIn} onSignUp={handleSignUp} loading={loginLoading} />;
   }
 
-  const allowedRoles = routeRoles[pathname] || routeRoles["/dashboard"];
+  const allowedRoles = allowedRolesForPath(pathname);
   if (!allowedRoles.includes(user.role)) {
     return (
       <div className="min-h-screen text-slate-200">

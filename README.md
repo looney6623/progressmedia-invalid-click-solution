@@ -91,6 +91,69 @@ IP_HASH_SALT=change-me
 
 광고주 목록에서는 광고주별 로그인 계정 수를 표시합니다. 계정 수가 0이면 `계정 미발급` 배지를 표시하고, `계정 발급` 버튼으로 해당 광고주가 선택된 계정 발급 탭으로 이동합니다.
 
+## 상용 서비스형 메뉴 구조
+
+좌측 사이드바는 분석 솔루션형 IA에 맞춰 그룹형 메뉴로 구성했습니다. 스마트로그류 서비스의 정보 구조에서 "분석 관점 분리"만 참고했으며, 프로그레스미디어 고유의 다크톤 UI와 민트 brand color를 유지합니다.
+
+- 메인: 대시보드
+- 방문자 분석: 실시간 방문자, 방문자 로그, 페이지별 유입
+- 부정클릭 분석: 광고 클릭 IP, 의심 클릭 IP, 차단된 IP, 반복 클릭 IP, 노출제한 IP
+- 차단 관리: 자동 차단 규칙, 수동 차단 IP, 차단 해제 이력
+- 전환 분석: 전환 이벤트, 전환 로그, 광고비 절감 추정
+- 로그 분석: 전체 로그, Referrer URL, UTM 분석, 검색어/키워드
+- 광고주 관리: 광고주 목록, 광고주/사이트 등록, 광고주 로그인 계정 발급, 설치 스크립트
+- 리포트: 광고주 리포트, CSV 내보내기, 인쇄용 리포트
+- 설정: 내 계정, 운영 정책
+
+주요 route:
+
+```text
+/dashboard
+/visitors/realtime
+/visitors/logs
+/visitors/pages
+/invalid-clicks/ad-click-ip
+/invalid-clicks/suspicious-ip
+/invalid-clicks/blocked-ip
+/invalid-clicks/repeated-ip
+/invalid-clicks/exposure-limited-ip
+/blocks/rules
+/blocks/manual
+/blocks/history
+/conversions/events
+/conversions/logs
+/conversions/savings
+/logs/all
+/logs/referrers
+/logs/utm
+/logs/keywords
+/advertisers
+/advertisers/create
+/advertisers/accounts
+/advertisers/scripts
+/reports/advertisers
+/reports/export
+/reports/print
+/settings/account
+/settings/policy
+```
+
+role별 메뉴 접근:
+
+- `admin`: 전체 메뉴 접근 가능
+- `marketer`: 대시보드, 방문자 분석, 부정클릭 분석, 차단 관리, 전환 분석, 로그 분석, 광고주 관리, 리포트, 내 계정 접근 가능
+- `advertiser`: 대시보드, 실시간 방문자, 방문자 로그, 광고 클릭 IP, 의심 클릭 IP, 차단된 IP, 전환 이벤트, 광고주 리포트, 내 계정만 접근 가능
+
+광고주 role은 광고주/사이트 등록, 광고주 로그인 계정 발급, 운영 정책, 다른 광고주 관리 기능을 볼 수 없습니다.
+
+메뉴별 주요 데이터 테이블:
+
+- 방문자 분석, 부정클릭 분석, 로그 분석: `pm_click_logs`
+- 차단 관리: `pm_blocked_ips`, `pm_click_logs`
+- 전환 분석: `pm_conversion_events`, `pm_click_logs`
+- 광고주 관리: `pm_advertisers`, `pm_marketer_advertisers`, `pm_advertiser_users`
+- 리포트: `pm_click_logs`, `pm_blocked_ips`, `pm_conversion_events`
+
 ## 광고주/사이트 등록 플로우
 
 마케터가 광고주/사이트 등록 버튼을 클릭하면 `POST /api/advertisers` 서버 API Route가 아래 작업을 처리합니다.
