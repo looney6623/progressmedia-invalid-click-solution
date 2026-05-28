@@ -66,7 +66,15 @@ export async function POST(request) {
 
   const stayTime = typeof body.stay_time === "number" ? body.stay_time : null;
   const pageCount = Number(readValue(body, "page_count", "pageCount") || 1);
-  const detection = await detectInvalidClick({ supabase, advertiserId: advertiser.id, ipHash, stayTime, pageCount });
+  const detection = await detectInvalidClick({
+    supabase,
+    advertiserId: advertiser.id,
+    ipHash,
+    stayTime,
+    pageCount,
+    referrer: body.referrer || "",
+    utmSource: body.utm_source || ""
+  });
   const createdAt = new Date().toISOString();
   const payload = {
     advertiser_id: advertiser.id,
@@ -90,11 +98,12 @@ export async function POST(request) {
     risk_score: detection.risk_score,
     reason: detection.reason,
     recent_count: detection.recent_count,
+    applied_rules: detection.applied_rules || [],
     cpc: Number(body.cpc || 0),
     created_at: createdAt
   };
 
-  const { data: inserted, error: insertError } = await supabase.from("pm_click_logs").insert(payload).select("id,click_status,risk_score,reason,recent_count,created_at").single();
+  const { data: inserted, error: insertError } = await supabase.from("pm_click_logs").insert(payload).select("id,click_status,risk_score,reason,recent_count,applied_rules,created_at").single();
   if (insertError) return json({ ok: false, error: insertError.message }, { status: 500 });
 
   return json({
@@ -106,6 +115,7 @@ export async function POST(request) {
       risk_score: inserted.risk_score,
       reason: inserted.reason,
       recent_count: inserted.recent_count,
+      applied_rules: inserted.applied_rules || detection.applied_rules || [],
       matched_block: detection.matched_block,
       created_at: inserted.created_at
     }

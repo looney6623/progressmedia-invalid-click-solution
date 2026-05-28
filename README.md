@@ -548,6 +548,56 @@ limit 50;
 3. `pm_blocked_ips`에 수동 차단 등록 후 같은 `ip_hash`의 `/api/collect`가 즉시 `blocked` 처리되는지 확인합니다.
 4. 차단 관리 화면에서 활성 차단 목록, 의심 후보 로그, 차단 후보 로그가 role 범위 내에서만 보이는지 확인합니다.
 
+## 자동 차단 규칙과 수동 차단
+
+자동 차단 규칙은 `pm_block_rules`에 저장됩니다. 차단 관리의 ON/OFF 토글과 threshold 변경은 `PATCH /api/block-rules`를 통해 DB에 반영되며, `/api/collect`의 서버 판정에서 즉시 사용합니다.
+
+기본 규칙:
+
+- `repeat_click_suspicious`: 10분 내 3회 이상이면 `suspicious`
+- `repeat_click_block`: 10분 내 5회 이상이면 `blocked`
+- `short_stay`: 체류시간 3초 이하이면 위험도 가중
+- `no_page_move`: 페이지 이동 0회이면 위험도 가중
+- `partner_media_watch`: 제휴 매체 유입 관찰, 기본 OFF
+
+규칙을 OFF로 변경하면 해당 조건은 판정에서 제외됩니다. 단, `pm_blocked_ips`에 활성 등록된 IP hash는 규칙 토글과 무관하게 항상 `blocked` 처리합니다.
+
+수동 차단은 `pm_blocked_ips`에 저장됩니다.
+
+- 로그 기반 차단: 후보 로그의 `log_id`를 서버로 보내고, 서버가 `pm_click_logs.ip_hash`, `ip_masked`를 사용해 저장합니다.
+- 직접 입력 차단: 사용자가 입력한 `raw_ip`를 서버 API가 `IP_HASH_SALT`로 hash 처리하고, DB에는 `ip_hash`, `ip_masked`만 저장합니다.
+- 차단 해제: 실제 삭제하지 않고 `is_active=false`, `released_at=now()`로 soft release 처리합니다.
+
+IP 원문은 DB에 저장하지 않습니다. `IP_HASH_SALT`는 서버 환경변수로만 등록해야 하며 `NEXT_PUBLIC_` 접두어를 붙이면 안 됩니다.
+
+자동 차단 규칙 확인 SQL:
+
+```sql
+select a.name, r.rule_key, r.rule_name, r.action, r.threshold, r.risk_delta, r.is_enabled, r.updated_at
+from public.pm_block_rules r
+join public.pm_advertisers a on a.id = r.advertiser_id
+order by a.name, r.rule_key;
+```
+
+수동 차단 확인 SQL:
+
+```sql
+select a.name, b.client_id, b.ip_masked, b.reason, b.block_type, b.source, b.is_active, b.created_at, b.released_at
+from public.pm_blocked_ips b
+join public.pm_advertisers a on a.id = b.advertiser_id
+order by b.created_at desc
+limit 50;
+```
+
+차단 QA:
+
+1. 자동 차단 규칙에서 `repeat_click_suspicious`를 OFF로 변경한 뒤 같은 IP로 3회 수집해도 `suspicious`가 되지 않는지 확인합니다.
+2. 다시 ON으로 변경한 뒤 3회 수집 시 `suspicious`, 5회 수집 시 `blocked`가 반환되는지 확인합니다.
+3. 후보 로그에서 차단 등록을 눌러 `pm_blocked_ips`에 row가 생성되는지 확인합니다.
+4. 직접 IP 입력 차단 시 DB에 raw IP가 없고 `ip_hash`, `ip_masked`만 저장되는지 확인합니다.
+5. 차단 해제 시 `is_active=false`, `released_at`이 저장되는지 확인합니다.
+6. 활성 차단된 `ip_hash`로 다시 `/api/collect` 호출 시 `blocked` 처리되는지 확인합니다.
+
 광고주 생성 후 확인 SQL:
 
 ```sql

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { hashIp, maskIp } from "@/lib/privacy";
 import { createSupabaseServiceClient, hasServerSupabaseConfig, isServerLocalMode, serverMode } from "@/lib/serverSupabase";
 
 function json(body, init = {}) {
@@ -22,7 +23,8 @@ async function getRequester(supabase, request) {
     .maybeSingle();
   if (error) return { error: error.message, status: 500 };
   const role = profile?.role || userData.user.user_metadata?.role;
-  if (!profile?.is_active && profile) return { error: "비활성화된 계정입니다.", status: 403 };
+  if (!role) return { error: "권한 정보를 찾을 수 없습니다.", status: 403 };
+  if (profile?.is_active === false) return { error: "비활성화된 계정입니다.", status: 403 };
   return { requester: { id: userData.user.id, role, email: userData.user.email } };
 }
 
@@ -72,14 +74,16 @@ export async function GET(request) {
   const ctx = await withAuth(request);
   if (ctx.fallback) return ctx.fallback;
   const { supabase, accessibleIds } = ctx;
+  const status = new URL(request.url).searchParams.get("status") || "active";
 
   if (Array.isArray(accessibleIds) && accessibleIds.length === 0) return json({ ok: true, items: [] });
 
   let query = supabase
     .from("pm_blocked_ips")
-    .select("id,advertiser_id,client_id,ip_hash,ip_masked,reason,block_type,source,is_active,created_by,created_at,released_at,advertiser:pm_advertisers(name)")
-    .eq("is_active", true)
+    .select("id,advertiser_id,client_id,ip_hash,ip_masked,reason,block_type,source,is_active,created_by,created_at,released_at,release_reason,advertiser:pm_advertisers(name)")
     .order("created_at", { ascending: false });
+  if (status === "released") query = query.or("is_active.eq.false,released_at.not.is.null");
+  else if (status !== "all") query = query.eq("is_active", true);
   if (accessibleIds) query = query.in("advertiser_id", accessibleIds);
   const { data, error } = await query;
   if (error) return json({ ok: false, error: error.message }, { status: 500 });
@@ -91,15 +95,34 @@ export async function POST(request) {
   if (ctx.fallback) return ctx.fallback;
   const { supabase, requester, accessibleIds } = ctx;
   const body = await request.json().catch(() => ({}));
-  const advertiser = await resolveAdvertiser(supabase, { advertiserId: body.advertiser_id || body.advertiserId, clientId: body.client_id || body.clientId });
+
+  let log = null;
+  if (body.log_id || body.logId) {
+    const { data, error } = await supabase
+      .from("pm_click_logs")
+      .select("id,advertiser_id,client_id,ip_hash,ip_masked")
+      .eq("id", body.log_id || body.logId)
+      .maybeSingle();
+    if (error) return json({ ok: false, error: error.message }, { status: 500 });
+    if (!data) return json({ ok: false, error: "log not found" }, { status: 404 });
+    log = data;
+  }
+
+  const advertiser = await resolveAdvertiser(supabase, {
+    advertiserId: log?.advertiser_id || body.advertiser_id || body.advertiserId,
+    clientId: log?.client_id || body.client_id || body.clientId
+  });
   if (!advertiser) return json({ ok: false, error: "advertiser not found" }, { status: 404 });
   if (!canAccess(accessibleIds, advertiser.id)) return json({ ok: false, error: "접근 권한이 없습니다." }, { status: 403 });
-  if (!body.ip_hash && !body.ipHash) return json({ ok: false, error: "ip_hash가 필요합니다." }, { status: 400 });
 
-  const ipHash = body.ip_hash || body.ipHash;
+  const rawIp = body.raw_ip || body.rawIp || "";
+  const ipHash = log?.ip_hash || body.ip_hash || body.ipHash || (rawIp ? hashIp(rawIp) : "");
+  const ipMasked = log?.ip_masked || body.ip_masked || body.ipMasked || (rawIp ? maskIp(rawIp) : "");
+  if (!ipHash) return json({ ok: false, error: rawIp ? "IP_HASH_SALT 설정이 필요합니다." : "log_id, ip_hash 또는 raw_ip가 필요합니다." }, { status: 400 });
+
   const { data: existing, error: existingError } = await supabase
     .from("pm_blocked_ips")
-    .select("id,advertiser_id,client_id,ip_hash,ip_masked,reason,block_type,source,is_active,created_by,created_at,released_at")
+    .select("id,advertiser_id,client_id,ip_hash,ip_masked,reason,block_type,source,is_active,created_by,created_at,released_at,release_reason")
     .eq("advertiser_id", advertiser.id)
     .eq("ip_hash", ipHash)
     .eq("is_active", true)
@@ -113,14 +136,14 @@ export async function POST(request) {
       advertiser_id: advertiser.id,
       client_id: advertiser.client_id,
       ip_hash: ipHash,
-      ip_masked: body.ip_masked || body.ipMasked || "",
-      reason: body.reason || "manual block",
-      block_type: body.block_type || body.blockType || "manual",
+      ip_masked: ipMasked,
+      reason: body.reason || "수동 차단",
+      block_type: "manual",
       source: body.source || "dashboard",
       is_active: true,
       created_by: requester.id
     })
-    .select("id,advertiser_id,client_id,ip_hash,ip_masked,reason,block_type,source,is_active,created_by,created_at,released_at")
+    .select("id,advertiser_id,client_id,ip_hash,ip_masked,reason,block_type,source,is_active,created_by,created_at,released_at,release_reason")
     .single();
   if (error) return json({ ok: false, error: error.message }, { status: 500 });
   return json({ ok: true, block: data });
@@ -139,9 +162,9 @@ export async function PATCH(request) {
   if (!canAccess(accessibleIds, target.advertiser_id)) return json({ ok: false, error: "접근 권한이 없습니다." }, { status: 403 });
   const { data, error } = await supabase
     .from("pm_blocked_ips")
-    .update({ is_active: false, released_at: new Date().toISOString() })
+    .update({ is_active: false, released_at: new Date().toISOString(), release_reason: body.release_reason || body.releaseReason || null })
     .eq("id", id)
-    .select("id,released_at")
+    .select("id,released_at,release_reason")
     .single();
   if (error) return json({ ok: false, error: error.message }, { status: 500 });
   return json({ ok: true, releasedBlock: data });

@@ -72,6 +72,22 @@ create table if not exists public.pm_blocked_ips (
   released_at timestamp with time zone
 );
 
+create table if not exists public.pm_block_rules (
+  id uuid primary key default gen_random_uuid(),
+  advertiser_id uuid references public.pm_advertisers(id) on delete cascade,
+  rule_key text not null,
+  rule_name text not null,
+  description text,
+  action text not null default 'monitor',
+  threshold integer,
+  risk_delta integer not null default 0,
+  is_enabled boolean not null default true,
+  created_by uuid references auth.users(id),
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  unique (advertiser_id, rule_key)
+);
+
 create table if not exists public.pm_reports (
   id uuid primary key default gen_random_uuid(),
   advertiser_id uuid references public.pm_advertisers(id) on delete cascade,
@@ -88,6 +104,8 @@ create index if not exists idx_pm_advertiser_users_user on public.pm_advertiser_
 create index if not exists idx_pm_advertiser_users_advertiser on public.pm_advertiser_users(advertiser_id);
 create index if not exists idx_pm_click_logs_advertiser_time on public.pm_click_logs(advertiser_id, occurred_at desc);
 create index if not exists idx_pm_blocked_ips_advertiser on public.pm_blocked_ips(advertiser_id);
+create index if not exists idx_pm_block_rules_advertiser on public.pm_block_rules(advertiser_id);
+create index if not exists idx_pm_block_rules_key on public.pm_block_rules(rule_key);
 create index if not exists idx_pm_reports_advertiser_date on public.pm_reports(advertiser_id, report_date desc);
 
 -- Existing production DBs may still have an older role constraint that only allows admin/marketer.
@@ -116,6 +134,7 @@ alter table public.pm_click_logs add column if not exists stay_time integer;
 alter table public.pm_click_logs add column if not exists page_count integer;
 alter table public.pm_click_logs add column if not exists click_status text check (click_status in ('normal', 'suspicious', 'blocked'));
 alter table public.pm_click_logs add column if not exists recent_count integer;
+alter table public.pm_click_logs add column if not exists applied_rules jsonb not null default '[]'::jsonb;
 alter table public.pm_click_logs add column if not exists cpc numeric not null default 0;
 alter table public.pm_click_logs add column if not exists created_at timestamp with time zone not null default now();
 
@@ -129,10 +148,55 @@ alter table public.pm_blocked_ips add column if not exists source text not null 
 alter table public.pm_blocked_ips add column if not exists is_active boolean not null default true;
 alter table public.pm_blocked_ips add column if not exists created_at timestamp with time zone not null default now();
 alter table public.pm_blocked_ips add column if not exists released_at timestamp with time zone;
+alter table public.pm_blocked_ips add column if not exists release_reason text;
 alter table public.pm_blocked_ips add column if not exists created_by uuid references auth.users(id);
 create unique index if not exists uniq_pm_blocked_ips_active on public.pm_blocked_ips(advertiser_id, ip_hash) where is_active = true;
 create index if not exists idx_pm_blocked_ips_client_created_at on public.pm_blocked_ips(client_id, created_at desc);
 create index if not exists idx_pm_blocked_ips_is_active on public.pm_blocked_ips(is_active);
+
+create table if not exists public.pm_block_rules (
+  id uuid primary key default gen_random_uuid(),
+  advertiser_id uuid references public.pm_advertisers(id) on delete cascade,
+  rule_key text not null,
+  rule_name text not null,
+  description text,
+  action text not null default 'monitor',
+  threshold integer,
+  risk_delta integer not null default 0,
+  is_enabled boolean not null default true,
+  created_by uuid references auth.users(id),
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  unique (advertiser_id, rule_key)
+);
+
+alter table public.pm_block_rules add column if not exists advertiser_id uuid references public.pm_advertisers(id) on delete cascade;
+alter table public.pm_block_rules add column if not exists rule_key text;
+alter table public.pm_block_rules add column if not exists rule_name text;
+alter table public.pm_block_rules add column if not exists description text;
+alter table public.pm_block_rules add column if not exists action text not null default 'monitor';
+alter table public.pm_block_rules add column if not exists threshold integer;
+alter table public.pm_block_rules add column if not exists risk_delta integer not null default 0;
+alter table public.pm_block_rules add column if not exists is_enabled boolean not null default true;
+alter table public.pm_block_rules add column if not exists created_by uuid references auth.users(id);
+alter table public.pm_block_rules add column if not exists created_at timestamp with time zone not null default now();
+alter table public.pm_block_rules add column if not exists updated_at timestamp with time zone not null default now();
+create unique index if not exists uniq_pm_block_rules_advertiser_key on public.pm_block_rules(advertiser_id, rule_key);
+create index if not exists idx_pm_block_rules_advertiser_key on public.pm_block_rules(advertiser_id, rule_key);
+create index if not exists idx_pm_block_rules_enabled on public.pm_block_rules(is_enabled);
+
+insert into public.pm_block_rules (advertiser_id, rule_key, rule_name, description, action, threshold, risk_delta, is_enabled)
+select a.id, rule.rule_key, rule.rule_name, rule.description, rule.action, rule.threshold, rule.risk_delta, rule.is_enabled
+from public.pm_advertisers a
+cross join (
+  values
+    ('repeat_click_suspicious', '반복 클릭 의심', '같은 광고주와 IP 기준 10분 내 3회 이상 클릭 시 의심으로 판정합니다.', 'suspicious', 3, 0, true),
+    ('repeat_click_block', '반복 클릭 차단', '같은 광고주와 IP 기준 10분 내 5회 이상 클릭 시 차단으로 판정합니다.', 'blocked', 5, 0, true),
+    ('short_stay', '짧은 체류', '체류시간이 3초 이하이면 위험도를 가중합니다.', 'monitor', 3, 12, true),
+    ('no_page_move', '무이동 세션', '페이지 이동이 0회이면 위험도를 가중합니다.', 'monitor', 0, 10, true),
+    ('partner_media_watch', '제휴 매체 관찰', '제휴 매체 유입을 관찰 reason에 추가합니다.', 'monitor', null, 0, false)
+) as rule(rule_key, rule_name, description, action, threshold, risk_delta, is_enabled)
+on conflict (advertiser_id, rule_key) do nothing;
 
 create table if not exists public.pm_conversion_events (
   id uuid primary key default gen_random_uuid(),
@@ -194,6 +258,7 @@ alter table public.pm_marketer_advertisers enable row level security;
 alter table public.pm_advertiser_users enable row level security;
 alter table public.pm_click_logs enable row level security;
 alter table public.pm_blocked_ips enable row level security;
+alter table public.pm_block_rules enable row level security;
 alter table public.pm_reports enable row level security;
 
 create or replace function public.pm_is_admin()
@@ -353,6 +418,19 @@ with check (public.pm_can_manage_advertiser(advertiser_id));
 
 create policy "blocked_ips_update_manager"
 on public.pm_blocked_ips for update
+using (public.pm_can_manage_advertiser(advertiser_id))
+with check (public.pm_can_manage_advertiser(advertiser_id));
+
+create policy "block_rules_select_accessible"
+on public.pm_block_rules for select
+using (public.pm_can_access_advertiser(advertiser_id));
+
+create policy "block_rules_insert_manager"
+on public.pm_block_rules for insert
+with check (public.pm_can_manage_advertiser(advertiser_id));
+
+create policy "block_rules_update_manager"
+on public.pm_block_rules for update
 using (public.pm_can_manage_advertiser(advertiser_id))
 with check (public.pm_can_manage_advertiser(advertiser_id));
 

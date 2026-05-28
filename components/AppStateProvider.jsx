@@ -12,6 +12,7 @@ import {
   fetchAdvertiserAssignments,
   fetchAdvertiserUsers,
   fetchBlockedIps,
+  fetchBlockRules,
   fetchClickLogs,
   fetchCurrentUser,
   fetchMyAccessibleAdvertisers,
@@ -22,6 +23,7 @@ import {
   signInWithEmail,
   signOut,
   signUpMarketerAccount,
+  updateBlockRule,
   updateAdvertiserUserPermission
 } from "@/services/clickService";
 
@@ -48,6 +50,8 @@ export function AppStateProvider({ children }) {
   const [dataError, setDataError] = useState("");
   const [filters, setFilters] = useState(initialFilters);
   const [manualBlocks, setManualBlocks] = useState([]);
+  const [releasedBlocks, setReleasedBlocks] = useState([]);
+  const [blockRules, setBlockRules] = useState([]);
 
   async function loadAuthContext(nextUser) {
     if (!nextUser) {
@@ -61,12 +65,14 @@ export function AppStateProvider({ children }) {
       return;
     }
 
-    const [advertiserResult, memberResult, assignmentResult, advertiserUserResult, blockResult] = await Promise.all([
+    const [advertiserResult, memberResult, assignmentResult, advertiserUserResult, blockResult, releasedBlockResult, ruleResult] = await Promise.all([
       fetchMyAccessibleAdvertisers(nextUser),
       nextUser.role === "admin" ? fetchTeamMembers() : Promise.resolve({ items: [] }),
       nextUser.role === "admin" ? fetchAdvertiserAssignments() : Promise.resolve({ items: [] }),
       nextUser.role !== "advertiser" ? fetchAdvertiserUsers(nextUser) : Promise.resolve({ items: [] }),
-      fetchBlockedIps()
+      fetchBlockedIps(),
+      fetchBlockedIps({ status: "released" }),
+      fetchBlockRules()
     ]);
 
     setUser(nextUser);
@@ -75,6 +81,8 @@ export function AppStateProvider({ children }) {
     setAssignments(assignmentResult.items);
     setAdvertiserUsers(advertiserUserResult.items);
     setManualBlocks(blockResult.items || []);
+    setReleasedBlocks(releasedBlockResult.items || []);
+    setBlockRules(ruleResult.items || []);
     setFilters((prev) => ({ ...prev, advertiser: "전체" }));
 
     const logResult = await fetchClickLogs({
@@ -104,16 +112,20 @@ export function AppStateProvider({ children }) {
 
   async function refreshAccess(nextUser = user) {
     if (!nextUser) return;
-    const [advertiserResult, advertiserUserResult, assignmentResult, blockResult] = await Promise.all([
+    const [advertiserResult, advertiserUserResult, assignmentResult, blockResult, releasedBlockResult, ruleResult] = await Promise.all([
       fetchMyAccessibleAdvertisers(nextUser),
       nextUser.role !== "advertiser" ? fetchAdvertiserUsers(nextUser) : Promise.resolve({ items: [] }),
       nextUser.role === "admin" ? fetchAdvertiserAssignments() : Promise.resolve({ items: assignments }),
-      fetchBlockedIps()
+      fetchBlockedIps(),
+      fetchBlockedIps({ status: "released" }),
+      fetchBlockRules()
     ]);
     setMyAdvertisers(advertiserResult.items);
     setAdvertiserUsers(advertiserUserResult.items);
     setAssignments(assignmentResult.items);
     if (blockResult.items) setManualBlocks(blockResult.items);
+    if (releasedBlockResult.items) setReleasedBlocks(releasedBlockResult.items);
+    if (ruleResult.items) setBlockRules(ruleResult.items);
     const logResult = await fetchClickLogs({
       advertiserIds: nextUser.role === "admin" ? undefined : advertiserResult.items.map((item) => item.id)
     });
@@ -163,7 +175,25 @@ export function AppStateProvider({ children }) {
       }
     }
     setManualBlocks((prev) => prev.filter((block) => block.id !== idOrIp && block.ip !== idOrIp));
+    await refreshAccess();
     return { ok: true };
+  }
+
+  async function handleUpdateBlockRule(rule, patch) {
+    const previous = blockRules;
+    setBlockRules((prev) => prev.map((item) => item.id === rule.id ? { ...item, ...patch } : item));
+    const result = await updateBlockRule(rule, patch);
+    if (!result.ok) {
+      setBlockRules(previous);
+      setDataError(result.error || "자동 차단 규칙 저장에 실패했습니다.");
+      return result;
+    }
+    if (result.rule) {
+      setBlockRules((prev) => prev.map((item) => item.id === result.rule.id ? result.rule : item));
+    } else {
+      await refreshAccess();
+    }
+    return result;
   }
 
   async function handleAssign(marketerId, advertiserId) {
@@ -228,6 +258,8 @@ export function AppStateProvider({ children }) {
     filters,
     setFilters,
     manualBlocks,
+    releasedBlocks,
+    blockRules,
     filteredLogs,
     blockedLogs,
     suspiciousLogs,
@@ -240,6 +272,7 @@ export function AppStateProvider({ children }) {
     handleSignOut,
     addManualBlock,
     removeManualBlock,
+    handleUpdateBlockRule,
     handleAssign,
     handleRemoveAssignment,
     handleCreateAdvertiser,

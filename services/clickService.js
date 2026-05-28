@@ -202,6 +202,8 @@ function mapClickLogFromDb(item) {
     dwellSeconds: item.stay_time || 0,
     pageViews: item.page_count || 0,
     clickCountIn10Min: item.recent_count || item.click_count_10m || "-",
+    recentCount: item.recent_count || item.click_count_10m || 1,
+    appliedRules: Array.isArray(item.applied_rules) ? item.applied_rules : [],
     cpc: Number(item.cpc || 0),
     riskScore: item.risk_score || 0,
     status: statusToUi(item.click_status),
@@ -574,7 +576,7 @@ export async function fetchClickLogs(filters = {}) {
     const supabase = createSupabaseBrowserClient();
     let query = supabase
       .from("pm_click_logs")
-      .select("id,advertiser_id,client_id,visitor_id,session_id,ip_hash,ip_masked,user_agent,page_url,referrer,utm_source,utm_medium,utm_campaign,utm_term,utm_content,stay_time,page_count,click_status,risk_score,reason,recent_count,cpc,created_at,advertiser:pm_advertisers(name)")
+      .select("id,advertiser_id,client_id,visitor_id,session_id,ip_hash,ip_masked,user_agent,page_url,referrer,utm_source,utm_medium,utm_campaign,utm_term,utm_content,stay_time,page_count,click_status,risk_score,reason,recent_count,applied_rules,cpc,created_at,advertiser:pm_advertisers(name)")
       .order("created_at", { ascending: false })
       .limit(filters.limit || 500);
 
@@ -597,7 +599,39 @@ export async function fetchAdvertiserReports(logs = clickLogs) {
 }
 
 export async function fetchBlockRules() {
-  return { items: getBlockRules() };
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    const result = await apiRequest("/api/block-rules");
+    if (!result.ok) return { items: [], error: result.error || result.message };
+    return { items: result.rules || [] };
+  }
+  return { items: getBlockRules().map((rule) => ({
+    id: rule.id,
+    advertiserId: null,
+    ruleKey: rule.id,
+    ruleName: rule.name,
+    description: rule.condition,
+    action: rule.action,
+    threshold: rule.threshold || null,
+    riskDelta: 0,
+    isEnabled: rule.enabled !== false
+  })) };
+}
+
+export async function updateBlockRule(rule, patch) {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    return apiRequest("/api/block-rules", {
+      method: "PATCH",
+      payload: {
+        id: rule.id,
+        advertiser_id: rule.advertiserId,
+        rule_key: rule.ruleKey,
+        ...patch
+      }
+    });
+  }
+  return { ok: true, rule: { ...rule, ...patch } };
 }
 
 function mapBlockedIpFromApi(item) {
@@ -617,14 +651,16 @@ function mapBlockedIpFromApi(item) {
     isActive,
     createdAt: item.created_at || item.starts_at,
     releasedAt: item.released_at || item.ends_at,
+    releaseReason: item.release_reason || "",
     method: blockType === "auto" ? "자동 차단" : "수동 차단"
   };
 }
 
-export async function fetchBlockedIps() {
+export async function fetchBlockedIps(options = {}) {
   const mode = ensureServiceMode();
   if (mode === "supabase") {
-    const result = await apiRequest("/api/blocked-ips");
+    const suffix = options.status ? `?status=${encodeURIComponent(options.status)}` : "";
+    const result = await apiRequest(`/api/blocked-ips${suffix}`);
     if (!result.ok) return { items: [], error: result.error || result.message };
     return { items: (result.items || []).map(mapBlockedIpFromApi) };
   }
@@ -635,10 +671,12 @@ export async function createManualBlock(payload, currentUser) {
   const mode = ensureServiceMode();
   if (mode === "supabase") {
     const result = await apiPost("/api/blocked-ips", {
+      log_id: payload.logId,
       advertiser_id: payload.advertiserId,
       client_id: payload.clientId,
       ip_hash: payload.ipHash,
       ip_masked: payload.ipMasked || payload.ip || "-",
+      raw_ip: payload.rawIp,
       reason: payload.reason,
       block_type: "manual",
       source: "dashboard"
