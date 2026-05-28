@@ -37,6 +37,11 @@ select {
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
   body {
     background: #ffffff;
     color: #111827;
@@ -69,6 +74,7 @@ select {
     box-shadow: none !important;
     background: #ffffff !important;
     color: #111827 !important;
+    width: 100% !important;
   }
 
   .print-report,
@@ -84,5 +90,9 @@ select {
 
   .print-report .border-line {
     border-color: #d1d5db !important;
+  }
+
+  .print-report {
+    page-break-inside: auto;
   }
 }

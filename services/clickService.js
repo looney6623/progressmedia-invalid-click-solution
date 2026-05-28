@@ -590,6 +590,57 @@ export async function fetchClickLogs(filters = {}) {
   return { items: [], total: 0, error: getSupabaseConfigError() };
 }
 
+function mapConversionEventFromDb(item) {
+  const createdAt = new Date(item.created_at);
+  return {
+    id: item.id,
+    advertiserId: item.advertiser_id,
+    advertiser: item.advertiser?.name || item.client_id || "광고주",
+    clientId: item.client_id || "",
+    projectKey: item.project_key || "",
+    visitorId: item.visitor_id || "",
+    sessionId: item.session_id || "",
+    ipMasked: item.ip_masked || "-",
+    userAgent: item.user_agent || "",
+    pageUrl: item.page_url || "",
+    referrer: item.referrer || "",
+    utmSource: item.utm_source || "",
+    utmMedium: item.utm_medium || "",
+    utmCampaign: item.utm_campaign || "",
+    utmTerm: item.utm_term || "",
+    utmContent: item.utm_content || "",
+    eventName: item.event_name || "",
+    eventType: item.event_type || "conversion",
+    value: Number(item.value || 0),
+    currency: item.currency || "",
+    metadata: item.metadata || {},
+    conversionData: item.conversion_data || {},
+    createdAt,
+    dateTime: `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(createdAt.getDate()).padStart(2, "0")} ${String(createdAt.getHours()).padStart(2, "0")}:${String(createdAt.getMinutes()).padStart(2, "0")}`
+  };
+}
+
+export async function fetchConversionEvents(filters = {}) {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    if (Array.isArray(filters.advertiserIds) && filters.advertiserIds.length === 0) {
+      return { items: [], total: 0 };
+    }
+
+    let query = createSupabaseBrowserClient()
+      .from("pm_conversion_events")
+      .select("id,advertiser_id,client_id,project_key,visitor_id,session_id,ip_masked,user_agent,page_url,referrer,utm_source,utm_medium,utm_campaign,utm_term,utm_content,event_name,event_type,value,currency,metadata,conversion_data,created_at,advertiser:pm_advertisers(name)")
+      .order("created_at", { ascending: false })
+      .limit(filters.limit || 500);
+    if (filters.advertiserIds?.length) query = query.in("advertiser_id", filters.advertiserIds);
+    const { data, error } = await query;
+    if (error) return { items: [], total: 0, error: `Supabase pm_conversion_events 조회 실패: ${error.message}` };
+    const items = (data || []).map(mapConversionEventFromDb);
+    return { items, total: items.length };
+  }
+  return { items: [], total: 0 };
+}
+
 export async function fetchClickDashboard(logs = clickLogs) {
   return { summary: summarizeClicks(logs), advertiserStats: getAdvertiserStats(logs), mediaStats: getMediaStats(logs), hourlyTrend: getHourlyTrend(logs) };
 }

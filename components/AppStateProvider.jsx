@@ -14,6 +14,7 @@ import {
   fetchBlockedIps,
   fetchBlockRules,
   fetchClickLogs,
+  fetchConversionEvents,
   fetchCurrentUser,
   fetchMyAccessibleAdvertisers,
   fetchTeamMembers,
@@ -47,6 +48,7 @@ export function AppStateProvider({ children }) {
   const [assignments, setAssignments] = useState([]);
   const [advertiserUsers, setAdvertiserUsers] = useState([]);
   const [sourceLogs, setSourceLogs] = useState([]);
+  const [conversionEvents, setConversionEvents] = useState([]);
   const [dataError, setDataError] = useState("");
   const [filters, setFilters] = useState(initialFilters);
   const [manualBlocks, setManualBlocks] = useState([]);
@@ -61,6 +63,7 @@ export function AppStateProvider({ children }) {
       setAssignments([]);
       setAdvertiserUsers([]);
       setSourceLogs([]);
+      setConversionEvents([]);
       setDataError("");
       return;
     }
@@ -88,8 +91,12 @@ export function AppStateProvider({ children }) {
     const logResult = await fetchClickLogs({
       advertiserIds: nextUser.role === "admin" ? undefined : advertiserResult.items.map((item) => item.id)
     });
+    const conversionResult = await fetchConversionEvents({
+      advertiserIds: nextUser.role === "admin" ? undefined : advertiserResult.items.map((item) => item.id)
+    });
     setSourceLogs(logResult.items || []);
-    setDataError(logResult.error || "");
+    setConversionEvents(conversionResult.items || []);
+    setDataError(logResult.error || conversionResult.error || "");
   }
 
   useEffect(() => {
@@ -129,8 +136,12 @@ export function AppStateProvider({ children }) {
     const logResult = await fetchClickLogs({
       advertiserIds: nextUser.role === "admin" ? undefined : advertiserResult.items.map((item) => item.id)
     });
+    const conversionResult = await fetchConversionEvents({
+      advertiserIds: nextUser.role === "admin" ? undefined : advertiserResult.items.map((item) => item.id)
+    });
     setSourceLogs(logResult.items || []);
-    setDataError(logResult.error || "");
+    setConversionEvents(conversionResult.items || []);
+    setDataError(logResult.error || conversionResult.error || "");
   }
 
   async function handleSignIn(email, password) {
@@ -254,12 +265,14 @@ export function AppStateProvider({ children }) {
     teamMembers,
     assignments,
     advertiserUsers,
+    conversionEvents,
     dataError,
     filters,
     setFilters,
     manualBlocks,
     releasedBlocks,
     blockRules,
+    accessibleLogs: permissionLogs,
     filteredLogs,
     blockedLogs,
     suspiciousLogs,

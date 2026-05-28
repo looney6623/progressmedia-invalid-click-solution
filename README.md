@@ -598,6 +598,96 @@ limit 50;
 5. 차단 해제 시 `is_active=false`, `released_at`이 저장되는지 확인합니다.
 6. 활성 차단된 `ip_hash`로 다시 `/api/collect` 호출 시 `blocked` 처리되는지 확인합니다.
 
+## 광고주 리포트 / CSV / 인쇄
+
+광고주 리포트는 권한 범위 내 Supabase 운영 데이터를 기준으로 생성합니다.
+
+사용 테이블:
+
+- `pm_click_logs`: 클릭, 상태, 위험도, 체류시간, 유입/UTM, page_url, recent_count
+- `pm_blocked_ips`: 활성 차단 IP, 차단 해제 이력
+- `pm_conversion_events`: 전환 이벤트 수와 전환 추이
+- `pm_advertisers`: 광고주명, client_id
+- `pm_marketer_advertisers`: 마케터 담당 광고주 범위
+- `pm_advertiser_users`: 광고주 계정 접근 범위
+
+리포트 지표:
+
+- 총/정상/의심/차단 클릭수
+- 의심 클릭률, 차단 클릭률
+- 평균 위험도, 평균 체류시간
+- 최근 10분 반복 클릭 기준 TOP IP
+- 의심 사유 TOP 5
+- 유입 경로 TOP 5
+- UTM source/medium/campaign 요약
+- page_url TOP 5
+- 전환 이벤트 수
+- 예상 절감 광고비
+- 활성 차단 IP 수
+- 최근 차단/해제 이력
+
+role별 접근:
+
+- `admin`: 전체 광고주 리포트 조회 가능
+- `marketer`: `pm_marketer_advertisers`에 연결된 담당 광고주만 조회 가능
+- `advertiser`: `pm_advertiser_users`에 연결된 본인 광고주만 조회 가능하며 광고주 선택 드롭다운에도 본인 광고주만 표시
+
+날짜 필터:
+
+- 오늘
+- 어제
+- 최근 7일
+- 최근 30일
+- 직접 날짜 범위
+
+리포트 날짜 필터는 KPI, 차트, CSV, 인쇄용 리포트에 동일하게 반영됩니다.
+
+CSV 내보내기:
+
+- 파일명: `progressmedia-invalid-click-report.csv`
+- 한글 깨짐 방지를 위해 UTF-8 BOM을 포함합니다.
+- 기본 컬럼: 광고주명, client_id, 시간, IP 마스킹, 페이지 URL, referrer, UTM source/medium/campaign, click_status, risk_score, recent_count, reason, stay_time, conversion 여부
+- `ip_hash`는 기본 CSV에 포함하지 않습니다.
+
+인쇄용 리포트:
+
+- 리포트 화면의 인쇄 버튼은 `window.print()`를 사용합니다.
+- 인쇄 시 사이드바와 필터 UI는 숨기고 리포트 본문만 출력합니다.
+- A4 기준으로 광고주명, 기간, 생성일, KPI, 의심 사유, 차단 IP, 유입 경로, 전환 요약, IP 처리 안내 문구를 표시합니다.
+
+리포트 확인 SQL:
+
+```sql
+select a.name, l.client_id, l.created_at, l.ip_masked, l.page_url, l.referrer,
+       l.utm_source, l.utm_medium, l.utm_campaign, l.click_status,
+       l.risk_score, l.recent_count, l.reason, l.stay_time
+from public.pm_click_logs l
+join public.pm_advertisers a on a.id = l.advertiser_id
+order by l.created_at desc
+limit 50;
+
+select a.name, e.event_name, e.event_type, e.value, e.created_at
+from public.pm_conversion_events e
+join public.pm_advertisers a on a.id = e.advertiser_id
+order by e.created_at desc
+limit 50;
+
+select a.name, b.ip_masked, b.reason, b.is_active, b.created_at, b.released_at
+from public.pm_blocked_ips b
+join public.pm_advertisers a on a.id = b.advertiser_id
+order by b.created_at desc
+limit 50;
+```
+
+리포트 QA:
+
+1. admin으로 로그인해 전체 광고주 리포트가 보이는지 확인합니다.
+2. marketer로 로그인해 담당 광고주만 보이는지 확인합니다.
+3. advertiser로 로그인해 본인 광고주만 드롭다운에 표시되는지 확인합니다.
+4. 날짜 필터를 변경했을 때 KPI, 차트, CSV, 인쇄 내용이 같이 바뀌는지 확인합니다.
+5. CSV에 `ip_hash`가 포함되지 않는지 확인합니다.
+6. 인쇄 미리보기에서 사이드바와 필터가 숨겨지는지 확인합니다.
+
 광고주 생성 후 확인 SQL:
 
 ```sql
