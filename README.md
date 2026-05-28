@@ -445,6 +445,8 @@ released_at timestamptz
 4. 이후 같은 광고주의 동일 `ip_hash`는 `/api/collect`에서 즉시 `blocked`로 저장됩니다.
 5. 차단 해제는 `is_active=false`, `released_at=now()`로 처리합니다.
 
+차단 관리 화면은 실제 `pm_blocked_ips`와 `pm_click_logs`만 사용합니다. 기존 브라우저 상태값 기반 mock 차단 IP와 샘플 차단 목록은 제거되었습니다. 수동 차단은 IP 원문이 아니라 `ip_hash` 기준으로 동작하므로, 운영에서는 직접 IP를 입력하기보다 수집 로그 후보에서 선택해 차단하는 방식을 권장합니다.
+
 차단 확인 SQL:
 
 ```sql

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { getAdvertiserStats, getHourlyTrend, getMediaStats, summarizeClicks } from "@/lib/clickData";
-import { enrichWithManualBlocks, filterClicks } from "@/lib/filterClicks";
+import { filterClicks } from "@/lib/filterClicks";
 import {
   assignAdvertiserToMarketer,
   createManualBlock,
@@ -27,11 +27,6 @@ import {
 
 const AppStateContext = createContext(null);
 
-const initialManualBlocks = [
-  { ip: "211.44.18.91", reason: "샤브20 브랜드 키워드 반복 클릭", createdAt: "2026-05-27 14:29", method: "수동 차단" },
-  { ip: "59.9.104.201", reason: "3분페이 제휴 매체 저품질 유입", createdAt: "2026-05-27 14:12", method: "수동 차단" }
-];
-
 const initialFilters = {
   advertiser: "전체",
   media: "전체",
@@ -52,7 +47,7 @@ export function AppStateProvider({ children }) {
   const [sourceLogs, setSourceLogs] = useState([]);
   const [dataError, setDataError] = useState("");
   const [filters, setFilters] = useState(initialFilters);
-  const [manualBlocks, setManualBlocks] = useState(initialManualBlocks);
+  const [manualBlocks, setManualBlocks] = useState([]);
 
   async function loadAuthContext(nextUser) {
     if (!nextUser) {
@@ -79,7 +74,7 @@ export function AppStateProvider({ children }) {
     setTeamMembers(memberResult.items);
     setAssignments(assignmentResult.items);
     setAdvertiserUsers(advertiserUserResult.items);
-    setManualBlocks(blockResult.items?.length ? blockResult.items : initialManualBlocks);
+    setManualBlocks(blockResult.items || []);
     setFilters((prev) => ({ ...prev, advertiser: "전체" }));
 
     const logResult = await fetchClickLogs({
@@ -211,8 +206,7 @@ export function AppStateProvider({ children }) {
     return sourceLogs.filter((log) => allowedAdvertiserNames.includes(log.advertiser));
   }, [allowedAdvertiserNames, sourceLogs, user]);
 
-  const blockedAwareLogs = useMemo(() => enrichWithManualBlocks(permissionLogs, manualBlocks), [manualBlocks, permissionLogs]);
-  const filteredLogs = useMemo(() => filterClicks(blockedAwareLogs, filters), [blockedAwareLogs, filters]);
+  const filteredLogs = useMemo(() => filterClicks(permissionLogs, filters), [permissionLogs, filters]);
   const summary = useMemo(() => summarizeClicks(filteredLogs), [filteredLogs]);
   const advertiserStats = useMemo(() => getAdvertiserStats(filteredLogs), [filteredLogs]);
   const mediaStats = useMemo(() => getMediaStats(filteredLogs), [filteredLogs]);

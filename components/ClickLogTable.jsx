@@ -68,7 +68,7 @@ export default function ClickLogTable({ logs, onRefresh }) {
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead className="bg-panelSoft text-xs uppercase text-slate-500">
             <tr>
-          {["시간", "광고주", "client_id", "IP", "페이지 URL", "유입/referrer", "UTM", "체류", "위험도", "상태", "판정 사유", "상세"].map((head) => (
+          {["시간", "광고주", "client_id", "IP", "페이지 URL", "유입/referrer", "UTM", "체류", "최근 클릭", "위험도", "상태", "판정 사유", "상세"].map((head) => (
                 <th key={head} className="px-4 py-3 font-semibold">
                   {head}
                 </th>
@@ -86,6 +86,7 @@ export default function ClickLogTable({ logs, onRefresh }) {
                 <td className="max-w-[220px] truncate px-4 py-3 text-slate-300">{log.referrer || log.media}</td>
                 <td className="max-w-[220px] truncate px-4 py-3 text-slate-400">{log.utm || "-"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-300">{log.dwellSeconds}s</td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-300">{log.clickCountIn10Min || "-"}</td>
                 <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-100">{log.riskScore}</td>
                 <td className="whitespace-nowrap px-4 py-3">
                   <StatusBadge status={log.status} />

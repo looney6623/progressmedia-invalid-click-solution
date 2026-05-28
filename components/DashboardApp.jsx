@@ -26,7 +26,7 @@ import {
   summarizeClicks
 } from "@/lib/clickData";
 import { downloadClickReportCsv } from "@/lib/exportCsv";
-import { enrichWithManualBlocks, filterClicks } from "@/lib/filterClicks";
+import { filterClicks } from "@/lib/filterClicks";
 import {
   assignAdvertiserToMarketer,
   createAdvertiserUser,
@@ -44,11 +44,6 @@ import {
   signUpMarketerAccount,
   updateAdvertiserUserPermission
 } from "@/services/clickService";
-
-const initialManualBlocks = [
-  { ip: "211.44.18.91", reason: "샤브20 브랜드 키워드 반복 클릭", createdAt: "2026-05-27 14:29", method: "수동 차단" },
-  { ip: "59.9.104.201", reason: "3분페이 제휴 매체 저품질 유입", createdAt: "2026-05-27 14:12", method: "수동 차단" }
-];
 
 function SectionLead({ title, children }) {
   return (
@@ -92,7 +87,7 @@ export default function DashboardApp() {
     dateRange: "오늘",
     query: ""
   });
-  const [manualBlocks, setManualBlocks] = useState(initialManualBlocks);
+  const [manualBlocks, setManualBlocks] = useState([]);
   const [activeSection, setActiveSection] = useState("dashboard");
 
   async function loadAuthContext(nextUser) {
@@ -160,8 +155,7 @@ export default function DashboardApp() {
     if (user.role === "admin") return clickLogs;
     return clickLogs.filter((log) => allowedAdvertiserNames.includes(log.advertiser));
   }, [allowedAdvertiserNames, user]);
-  const blockedAwareLogs = useMemo(() => enrichWithManualBlocks(permissionLogs, manualBlocks), [manualBlocks, permissionLogs]);
-  const filteredLogs = useMemo(() => filterClicks(blockedAwareLogs, filters), [blockedAwareLogs, filters]);
+  const filteredLogs = useMemo(() => filterClicks(permissionLogs, filters), [permissionLogs, filters]);
   const summary = useMemo(() => summarizeClicks(filteredLogs), [filteredLogs]);
   const advertiserStats = useMemo(() => getAdvertiserStats(filteredLogs), [filteredLogs]);
   const mediaStats = useMemo(() => getMediaStats(filteredLogs), [filteredLogs]);

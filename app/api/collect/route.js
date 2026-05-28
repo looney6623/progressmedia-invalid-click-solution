@@ -106,6 +106,7 @@ export async function POST(request) {
       risk_score: inserted.risk_score,
       reason: inserted.reason,
       recent_count: inserted.recent_count,
+      matched_block: detection.matched_block,
       created_at: inserted.created_at
     }
   });

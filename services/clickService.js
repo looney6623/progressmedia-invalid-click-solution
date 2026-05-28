@@ -610,6 +610,8 @@ export async function fetchBlockRules() {
 }
 
 function mapBlockedIpFromApi(item) {
+  const blockType = item.block_type || item.method || "manual";
+  const isActive = item.is_active ?? (!item.released_at && !item.ends_at);
   return {
     id: item.id,
     advertiserId: item.advertiser_id,
@@ -619,12 +621,12 @@ function mapBlockedIpFromApi(item) {
     ip: item.ip_masked || "-",
     ipMasked: item.ip_masked || "-",
     reason: item.reason || "-",
-    blockType: item.block_type || "manual",
+    blockType,
     source: item.source || "dashboard",
-    isActive: item.is_active !== false,
-    createdAt: item.created_at,
-    releasedAt: item.released_at,
-    method: item.block_type === "auto" ? "자동 차단" : "수동 차단"
+    isActive,
+    createdAt: item.created_at || item.starts_at,
+    releasedAt: item.released_at || item.ends_at,
+    method: blockType === "auto" ? "자동 차단" : "수동 차단"
   };
 }
 
