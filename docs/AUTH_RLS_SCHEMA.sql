@@ -55,7 +55,10 @@ create table if not exists public.pm_click_logs (
   status text check (status in ('normal', 'suspicious', 'blocked')),
   risk_score integer not null default 0,
   reason text,
-  occurred_at timestamp with time zone not null default now()
+  occurred_at timestamp with time zone not null default now(),
+  updated_at timestamptz default now(),
+  status_corrected_at timestamptz,
+  status_corrected_by uuid references auth.users(id)
 );
 
 create table if not exists public.pm_blocked_ips (
@@ -140,6 +143,9 @@ alter table public.pm_click_logs add column if not exists recent_count integer;
 alter table public.pm_click_logs add column if not exists applied_rules jsonb not null default '[]'::jsonb;
 alter table public.pm_click_logs add column if not exists cpc numeric not null default 0;
 alter table public.pm_click_logs add column if not exists created_at timestamp with time zone not null default now();
+alter table public.pm_click_logs add column if not exists updated_at timestamptz default now();
+alter table public.pm_click_logs add column if not exists status_corrected_at timestamptz;
+alter table public.pm_click_logs add column if not exists status_corrected_by uuid references auth.users(id);
 
 create index if not exists idx_pm_click_logs_advertiser_created_at on public.pm_click_logs(advertiser_id, created_at desc);
 create index if not exists idx_pm_click_logs_ip_hash_created_at on public.pm_click_logs(ip_hash, created_at desc);

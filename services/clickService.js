@@ -155,6 +155,7 @@ function advertiserFromDb(item) {
     projectKey: item.project_key,
     siteUrl: item.site_url,
     status: item.status,
+    blockingEnabled: item.blocking_enabled !== false,
     createdBy: item.created_by
   };
 }
@@ -359,21 +360,21 @@ export async function fetchMyAccessibleAdvertisers(user) {
   if (mode === "supabase") {
     const supabase = createSupabaseBrowserClient();
     if (user.role === "admin") {
-      const { data, error } = await supabase.from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,created_by").order("name");
+      const { data, error } = await supabase.from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,blocking_enabled,created_by").order("name");
       if (error) throw new Error(error.message);
       return { items: (data || []).map(advertiserFromDb) };
     }
     if (user.role === "marketer") {
       const { data, error } = await supabase
         .from("pm_marketer_advertisers")
-        .select("advertiser:pm_advertisers(id,name,client_id,project_key,site_url,status,created_by),permission")
+        .select("advertiser:pm_advertisers(id,name,client_id,project_key,site_url,status,blocking_enabled,created_by),permission")
         .eq("marketer_id", user.id);
       if (error) throw new Error(error.message);
       return { items: (data || []).filter((item) => item.advertiser).map((item) => ({ ...advertiserFromDb(item.advertiser), permission: item.permission })) };
     }
     const { data, error } = await supabase
       .from("pm_advertiser_users")
-      .select("advertiser:pm_advertisers(id,name,client_id,project_key,site_url,status,created_by),permission")
+      .select("advertiser:pm_advertisers(id,name,client_id,project_key,site_url,status,blocking_enabled,created_by),permission")
       .eq("user_id", user.id);
     if (error) throw new Error(error.message);
     return { items: (data || []).filter((item) => item.advertiser).map((item) => ({ ...advertiserFromDb(item.advertiser), permission: item.permission })) };
@@ -690,7 +691,7 @@ export async function updateBlockRule(rule, patch) {
 export async function updateAdvertiserBlocking(advertiserId, blockingEnabled) {
   const mode = ensureServiceMode();
   if (mode === "supabase") {
-    return apiRequest("/api/block-rules", {
+    return apiRequest("/api/advertisers", {
       method: "PATCH",
       payload: { advertiser_id: advertiserId, blocking_enabled: blockingEnabled }
     });
@@ -773,7 +774,7 @@ export async function updateClickLogStatus(logId, clickStatus, reason) {
 export async function fetchAdvertisers() {
   const mode = ensureServiceMode();
   if (mode === "supabase") {
-    const { data, error } = await createSupabaseBrowserClient().from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,created_by").order("name");
+    const { data, error } = await createSupabaseBrowserClient().from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,blocking_enabled,created_by").order("name");
     if (error) throw new Error(error.message);
     return { items: (data || []).map(advertiserFromDb) };
   }

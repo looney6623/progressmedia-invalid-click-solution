@@ -824,3 +824,56 @@ components/AdvertiserUserManagement.jsx
 - 실제 Supabase 키는 코드에 넣지 않습니다.
 - service role key는 클라이언트 컴포넌트와 클라이언트 서비스에서 사용하지 않습니다.
 - 운영 모드에서 Supabase 설정 오류가 있으면 mock fallback으로 숨기지 않고 명확한 오류를 표시합니다.
+
+## 자동 차단 오작동 긴급 대응
+
+운영 화면에서는 `blocked` 로그와 실제 활성 차단 IP를 반드시 구분합니다.
+
+- `pm_click_logs.click_status='blocked'`: 수집 로그의 판정 상태입니다. 이 값만으로는 해제할 실제 차단 row가 없습니다.
+- `pm_blocked_ips.is_active=true`: 실제 차단 대상입니다. 차단 해제 버튼은 활성 차단 IP 목록에서만 제공합니다.
+- blocked 로그가 과하게 쌓인 경우에는 `PATCH /api/click-logs`로 `normal` 또는 `suspicious` 상태로 정정합니다.
+- 실제 차단을 해제할 때는 `pm_blocked_ips`를 삭제하지 않고 `is_active=false`, `released_at=now()`로 soft release 처리합니다.
+- 광고주별 긴급 중지는 `pm_advertisers.blocking_enabled=false`로 저장합니다. 이 상태에서는 반복 클릭, 짧은 체류, 무이동 세션 같은 자동 판정 규칙을 적용하지 않습니다.
+- 단, 이미 `pm_blocked_ips.is_active=true`로 등록된 IP hash는 긴급 중지 상태와 무관하게 계속 blocked 처리됩니다.
+- IP 원문은 저장하지 않습니다. 직접 IP 입력 차단도 서버 API에서 hash/masking 처리 후 `ip_hash`, `ip_masked`만 저장합니다.
+
+운영 중 자동 차단 오작동 시 권장 순서:
+
+1. 차단 관리 > 자동 판정 규칙에서 해당 광고주의 자동 차단 긴급 중지를 OFF 상태로 전환합니다.
+2. 활성 차단 IP 목록에서 실제 차단 row가 있는지 확인합니다.
+3. 실제 오탐 차단 row만 차단 해제합니다.
+4. 차단 판정 로그에서 과하게 판정된 `blocked` 로그를 `suspicious` 또는 `normal`로 상태 정정합니다.
+5. `pm_block_rules`의 threshold와 ON/OFF 상태를 점검한 뒤 자동 판정을 다시 켭니다.
+
+운영 DB 반영 SQL:
+
+```sql
+alter table public.pm_advertisers
+add column if not exists blocking_enabled boolean default true;
+
+alter table public.pm_click_logs
+add column if not exists updated_at timestamptz default now();
+
+alter table public.pm_click_logs
+add column if not exists status_corrected_at timestamptz;
+
+alter table public.pm_click_logs
+add column if not exists status_corrected_by uuid references auth.users(id);
+
+select id, name, blocking_enabled
+from public.pm_advertisers
+order by created_at desc;
+
+select id, advertiser_id, ip_masked, reason, block_type, is_active, released_at
+from public.pm_blocked_ips
+order by created_at desc
+limit 50;
+
+select id, advertiser_id, ip_masked, click_status, reason, status_corrected_at
+from public.pm_click_logs
+where click_status in ('suspicious', 'blocked')
+order by created_at desc
+limit 50;
+
+notify pgrst, 'reload schema';
+```

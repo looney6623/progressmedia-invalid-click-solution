@@ -169,7 +169,7 @@ export default function BlockManagement({
           <div className="space-y-5 p-5">
             {advertisers.map((advertiser) => {
               const rules = rulesByAdvertiser.get(advertiser.id) || [];
-              const blockingEnabled = rules[0]?.blockingEnabled !== false;
+              const blockingEnabled = rules[0]?.blockingEnabled ?? advertiser.blockingEnabled ?? true;
               return (
                 <div key={advertiser.id} className="rounded-lg border border-line bg-panelSoft p-4">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -186,6 +186,11 @@ export default function BlockManagement({
                       {savingKey === `blocking-${advertiser.id}` ? "저장 중" : blockingEnabled ? "긴급 자동 차단 중지" : "자동 판정 다시 켜기"}
                     </button>
                   </div>
+                  {!blockingEnabled && (
+                    <div className="mb-4 rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-xs font-semibold text-warning">
+                      자동 반복 클릭 차단이 중지되어 있습니다. 활성 차단 IP는 계속 차단됩니다.
+                    </div>
+                  )}
                   <div className="grid gap-3 xl:grid-cols-2">
                     {rules.map((rule) => (
                       <div key={rule.id} className="rounded-md border border-line bg-ink p-4">
