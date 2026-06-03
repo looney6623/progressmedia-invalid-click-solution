@@ -95,7 +95,7 @@ export default function DashboardApp() {
   const [advertiserUsers, setAdvertiserUsers] = useState([]);
   const [filters, setFilters] = useState({
     advertiser: "전체",
-    media: "전체",
+    media: "all",
     status: "전체",
     dateRange: "오늘",
     query: ""

@@ -1,7 +1,7 @@
 import { Search } from "lucide-react";
 import { Card } from "@/components/ui";
+import { TRAFFIC_SOURCE_OPTIONS } from "@/lib/trafficSource";
 
-const mediaOptions = ["전체", "네이버 검색", "구글 검색", "메타", "카카오", "제휴 매체"];
 const statusOptions = ["전체", "정상", "의심", "차단"];
 const dateOptions = ["오늘", "최근 7일", "최근 30일"];
 
@@ -51,7 +51,7 @@ export default function FilterBar({ filters, setFilters, advertiserOptions }) {
       </div>
       <div className="grid gap-4 lg:grid-cols-[repeat(4,minmax(0,1fr))_1.4fr]">
         <FilterSelect label="광고주" value={filters.advertiser} onChange={(advertiser) => setFilters((prev) => ({ ...prev, advertiser }))} options={advertisers} />
-        <FilterSelect label="매체/유입경로" value={filters.media} onChange={(media) => setFilters((prev) => ({ ...prev, media }))} options={mediaOptions} />
+        <FilterSelect label="유입 경로" value={filters.media} onChange={(media) => setFilters((prev) => ({ ...prev, media }))} options={TRAFFIC_SOURCE_OPTIONS} />
         <FilterSelect label="상태" value={filters.status} onChange={(status) => setFilters((prev) => ({ ...prev, status }))} options={statusOptions} />
         <FilterSelect label="날짜 범위" value={filters.dateRange} onChange={(dateRange) => setFilters((prev) => ({ ...prev, dateRange }))} options={dateOptions} />
         <label className="flex min-w-0 flex-col gap-1.5">

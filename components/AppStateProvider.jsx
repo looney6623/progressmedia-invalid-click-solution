@@ -34,7 +34,7 @@ const AppStateContext = createContext(null);
 
 const initialFilters = {
   advertiser: "전체",
-  media: "전체",
+  media: "all",
   status: "전체",
   dateRange: "오늘",
   query: ""
