@@ -258,6 +258,62 @@ notify pgrst, 'reload schema';
 - 전환 요약 품질을 높이려면 전환 이벤트와 클릭 로그를 안정적으로 연결하는 `click_id` 또는 공통 attribution key가 필요합니다.
 - 절감액 정확도를 높이려면 광고주/캠페인/키워드별 실제 CPC를 저장하거나 외부 광고 API에서 비용을 동기화해야 합니다.
 
+## 네이버/GFA 광고 보호 URL
+
+네이버 광고 추적 URL에는 파라미터 등록 방식과 URL 등록 방식이 있습니다. 이 솔루션의 `광고 보호 URL` 기능은 URL 등록 방식으로 동작합니다. 광고 클릭 시 네이버가 먼저 우리 서비스의 경유 URL을 호출하고, 서버가 클릭 로그와 차단 여부를 확인한 뒤 최종 랜딩 URL로 302 이동시킵니다.
+
+스마트스토어/브랜드스토어는 내부 스크립트를 직접 설치하기 어려운 경우가 많으므로, 이 기능은 스크립트 설치 방식이 아니라 광고 클릭 경유 방식으로 보호합니다.
+
+관리 화면:
+
+- `/settings/tracking`
+- 메뉴명: `광고 보호 URL`
+- 지원 채널: 네이버 검색광고, 쇼핑검색광고, GFA
+- 입력값: 광고주, 채널, 이름, 최종 랜딩 URL, 허용 도메인
+
+생성 URL 예시:
+
+```text
+https://서비스도메인/api/r/naver?aid=광고주ID&lid=링크ID&n_final_url={final_url}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_mall_id={mall_id}&n_mall_pid={mall_pid}&n_ad_group_type={ad_group_type}
+```
+
+GFA 예시:
+
+```text
+https://서비스도메인/api/r/naver-gfa?aid=광고주ID&lid=링크ID&n_final_url={final_url}&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
+```
+
+동작 방식:
+
+1. `/api/r/naver` 또는 `/api/r/naver-gfa`가 `aid`, `lid`, `n_final_url`을 받습니다.
+2. `pm_tracking_links`에서 광고주/링크 활성 상태를 확인합니다.
+3. 최종 URL의 도메인이 `allowed_domain` 또는 등록 랜딩 URL 도메인과 일치하는지 검증합니다.
+4. `javascript:`, `data:`, `file:` 같은 URL은 차단합니다.
+5. IP 원문은 저장하지 않고 서버에서 hash/masking 처리합니다.
+6. 활성 차단 IP이면 최종 랜딩으로 보내지 않고 `/blocked-click` 안전 페이지로 이동합니다.
+7. 정상 클릭이면 `pm_click_logs`에 저장한 뒤 최종 랜딩 URL로 302 이동합니다.
+
+저장 매핑:
+
+- `n_campaign` → 캠페인명
+- `n_keyword` 또는 `n_query` → 검색어/키워드
+- `n_media` → 유입 매체
+- `n_ad_group`, `n_group`, `n_ad` → 보조 캠페인 정보
+- `n_mall_id`, `n_mall_pid` 등은 현재 `applied_rules`와 `reason`에 안전하게 요약 저장합니다.
+
+추후 개선 제안:
+
+- `pm_click_logs.tracking_params jsonb` 컬럼을 추가하면 네이버/GFA 치환 변수 원문을 구조적으로 저장할 수 있습니다.
+- 광고 채널별 CPC 또는 광고 API 비용 동기화를 붙이면 경유 클릭의 절감액 추정 정확도가 높아집니다.
+
+QA:
+
+1. `/settings/tracking`에서 광고주와 랜딩 URL을 입력해 보호 URL을 생성합니다.
+2. 생성된 테스트 URL을 열어 정상 랜딩되는지 확인합니다.
+3. 허용 도메인과 다른 `n_final_url`을 넣으면 400 또는 403이 반환되어야 합니다.
+4. 활성 차단 IP는 `/blocked-click`으로 이동해야 합니다.
+5. Supabase에서 `pm_click_logs`에 캠페인/키워드/매체 정보가 저장되는지 확인합니다.
+
 API가 `DB_ROLE_CONSTRAINT_MISMATCH`를 반환하면 위 SQL을 Supabase SQL Editor에 반영한 뒤 광고주 생성을 다시 시도합니다.
 
 ## API Route

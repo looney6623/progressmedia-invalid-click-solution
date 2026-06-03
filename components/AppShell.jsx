@@ -41,6 +41,7 @@ const routeRoles = {
   "/reports/export": ["admin", "marketer"],
   "/reports/print": ["admin", "marketer"],
   "/settings/account": ["admin", "marketer", "advertiser"],
+  "/settings/tracking": ["admin", "marketer"],
   "/settings/policy": ["admin", "marketer"],
   "/account": ["admin", "marketer", "advertiser"]
 };

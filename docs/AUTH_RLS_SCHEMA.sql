@@ -163,6 +163,21 @@ create unique index if not exists uniq_pm_blocked_ips_active on public.pm_blocke
 create index if not exists idx_pm_blocked_ips_client_created_at on public.pm_blocked_ips(client_id, created_at desc);
 create index if not exists idx_pm_blocked_ips_is_active on public.pm_blocked_ips(is_active);
 
+create table if not exists public.pm_tracking_links (
+  id uuid primary key default gen_random_uuid(),
+  advertiser_id uuid not null references public.pm_advertisers(id) on delete cascade,
+  channel text not null check (channel in ('naver_search', 'naver_shopping', 'naver_gfa', 'meta', 'google')),
+  name text not null,
+  destination_url text not null,
+  allowed_domain text not null,
+  is_active boolean not null default true,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
+create index if not exists idx_pm_tracking_links_advertiser on public.pm_tracking_links(advertiser_id, created_at desc);
+create index if not exists idx_pm_tracking_links_active on public.pm_tracking_links(is_active);
+
 create table if not exists public.pm_block_rules (
   id uuid primary key default gen_random_uuid(),
   advertiser_id uuid references public.pm_advertisers(id) on delete cascade,
@@ -270,6 +285,7 @@ alter table public.pm_advertiser_users enable row level security;
 alter table public.pm_click_logs enable row level security;
 alter table public.pm_blocked_ips enable row level security;
 alter table public.pm_block_rules enable row level security;
+alter table public.pm_tracking_links enable row level security;
 alter table public.pm_reports enable row level security;
 
 create or replace function public.pm_is_admin()
@@ -442,6 +458,19 @@ with check (public.pm_can_manage_advertiser(advertiser_id));
 
 create policy "block_rules_update_manager"
 on public.pm_block_rules for update
+using (public.pm_can_manage_advertiser(advertiser_id))
+with check (public.pm_can_manage_advertiser(advertiser_id));
+
+create policy "tracking_links_select_accessible"
+on public.pm_tracking_links for select
+using (public.pm_can_access_advertiser(advertiser_id));
+
+create policy "tracking_links_insert_manager"
+on public.pm_tracking_links for insert
+with check (public.pm_can_manage_advertiser(advertiser_id));
+
+create policy "tracking_links_update_manager"
+on public.pm_tracking_links for update
 using (public.pm_can_manage_advertiser(advertiser_id))
 with check (public.pm_can_manage_advertiser(advertiser_id));
 
