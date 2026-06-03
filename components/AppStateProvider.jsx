@@ -25,6 +25,7 @@ import {
   signOut,
   signUpMarketerAccount,
   updateAdvertiserBlocking,
+  updateAdvertiserNaverAccount,
   updateBlockRule,
   updateClickLogStatus,
   updateAdvertiserUserPermission
@@ -235,6 +236,16 @@ export function AppStateProvider({ children }) {
     return result;
   }
 
+  async function handleUpdateAdvertiserNaverAccount(advertiserId, naverAccountId) {
+    const result = await updateAdvertiserNaverAccount(advertiserId, naverAccountId);
+    if (!result.ok) {
+      setDataError(result.error || "네이버 광고계정 식별값 저장에 실패했습니다.");
+      return result;
+    }
+    await refreshAccess();
+    return result;
+  }
+
   async function handleUpdateClickLogStatus(logId, clickStatus, reason) {
     const result = await updateClickLogStatus(logId, clickStatus, reason);
     if (!result.ok) {
@@ -330,6 +341,7 @@ export function AppStateProvider({ children }) {
     removeManualBlock,
     handleUpdateBlockRule,
     handleUpdateAdvertiserBlocking,
+    handleUpdateAdvertiserNaverAccount,
     handleUpdateClickLogStatus,
     handleAssign,
     handleRemoveAssignment,

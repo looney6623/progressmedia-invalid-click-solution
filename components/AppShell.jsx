@@ -15,6 +15,7 @@ const routeRoles = {
   "/advertisers/create": ["admin", "marketer"],
   "/advertisers/accounts": ["admin", "marketer"],
   "/advertisers/scripts": ["admin", "marketer"],
+  "/advertisers/tracking": ["admin", "marketer"],
   "/visitors/realtime": ["admin", "marketer", "advertiser"],
   "/visitors/logs": ["admin", "marketer", "advertiser"],
   "/visitors/pages": ["admin", "marketer"],
@@ -41,7 +42,6 @@ const routeRoles = {
   "/reports/export": ["admin", "marketer"],
   "/reports/print": ["admin", "marketer"],
   "/settings/account": ["admin", "marketer", "advertiser"],
-  "/settings/tracking": ["admin", "marketer"],
   "/settings/policy": ["admin", "marketer"],
   "/account": ["admin", "marketer", "advertiser"]
 };

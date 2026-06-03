@@ -42,6 +42,7 @@ function mapAdvertiser(row) {
     siteUrl: row.site_url,
     status: row.status,
     blockingEnabled: row.blocking_enabled !== false,
+    naverAccountId: row.naver_account_id || "",
     createdBy: row.created_by
   };
 }
@@ -168,7 +169,7 @@ export async function POST(request) {
       blocking_enabled: true,
       created_by: auth.requester.id
     })
-    .select("id,name,client_id,project_key,site_url,status,blocking_enabled,created_by")
+    .select("id,name,client_id,project_key,site_url,status,blocking_enabled,naver_account_id,created_by")
     .single();
   if (advertiserError) return json({ ok: false, error: advertiserError.message }, { status: 500 });
 
@@ -187,11 +188,14 @@ export async function PATCH(request) {
   const body = await request.json().catch(() => ({}));
   const advertiserId = body.advertiser_id || body.advertiserId;
   const hasBlockingEnabled = body.blocking_enabled !== undefined || body.blockingEnabled !== undefined;
+  const hasNaverAccountId = body.naver_account_id !== undefined || body.naverAccountId !== undefined;
 
   if (!advertiserId) return json({ ok: false, error: "advertiser_id가 필요합니다." }, { status: 400 });
-  if (!hasBlockingEnabled) return json({ ok: false, error: "변경할 blocking_enabled 값이 필요합니다." }, { status: 400 });
+  if (!hasBlockingEnabled && !hasNaverAccountId) return json({ ok: false, error: "변경할 값이 필요합니다." }, { status: 400 });
 
-  const blockingEnabled = Boolean(body.blocking_enabled ?? body.blockingEnabled);
+  const patch = { updated_at: new Date().toISOString() };
+  if (hasBlockingEnabled) patch.blocking_enabled = Boolean(body.blocking_enabled ?? body.blockingEnabled);
+  if (hasNaverAccountId) patch.naver_account_id = String(body.naver_account_id ?? body.naverAccountId ?? "").trim();
 
   if (!hasServerSupabaseConfig()) {
     const localMode = isServerLocalMode();
@@ -199,7 +203,7 @@ export async function PATCH(request) {
       ok: localMode,
       mode: serverMode(),
       error: localMode ? undefined : "SERVER_CONFIGURATION_ERROR",
-      advertiser: { id: advertiserId, blockingEnabled }
+      advertiser: { id: advertiserId, blockingEnabled: patch.blocking_enabled, naverAccountId: patch.naver_account_id || "" }
     }, { status: localMode ? 200 : 503 });
   }
 
@@ -217,9 +221,9 @@ export async function PATCH(request) {
 
   const { data, error } = await supabase
     .from("pm_advertisers")
-    .update({ blocking_enabled: blockingEnabled, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq("id", advertiserId)
-    .select("id,name,client_id,project_key,site_url,status,blocking_enabled,created_by")
+    .select("id,name,client_id,project_key,site_url,status,blocking_enabled,naver_account_id,created_by")
     .single();
 
   if (error) return json({ ok: false, error: error.message }, { status: 500 });

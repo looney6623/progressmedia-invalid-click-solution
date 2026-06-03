@@ -20,6 +20,7 @@ create table if not exists public.pm_advertisers (
   project_key text not null unique,
   status text not null default 'active' check (status in ('active', 'inactive')),
   blocking_enabled boolean not null default true,
+  naver_account_id text,
   created_by uuid references public.pm_profiles(id),
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now()
@@ -124,6 +125,7 @@ alter table public.pm_advertisers add column if not exists site_url text;
 alter table public.pm_advertisers add column if not exists project_key text;
 alter table public.pm_advertisers add column if not exists created_by uuid references public.pm_profiles(id);
 alter table public.pm_advertisers add column if not exists blocking_enabled boolean not null default true;
+alter table public.pm_advertisers add column if not exists naver_account_id text;
 
 alter table public.pm_click_logs add column if not exists client_id text;
 alter table public.pm_click_logs add column if not exists visitor_id text;

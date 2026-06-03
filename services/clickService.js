@@ -156,6 +156,7 @@ function advertiserFromDb(item) {
     siteUrl: item.site_url,
     status: item.status,
     blockingEnabled: item.blocking_enabled !== false,
+    naverAccountId: item.naver_account_id || "",
     createdBy: item.created_by
   };
 }
@@ -360,21 +361,21 @@ export async function fetchMyAccessibleAdvertisers(user) {
   if (mode === "supabase") {
     const supabase = createSupabaseBrowserClient();
     if (user.role === "admin") {
-      const { data, error } = await supabase.from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,blocking_enabled,created_by").order("name");
+      const { data, error } = await supabase.from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,blocking_enabled,naver_account_id,created_by").order("name");
       if (error) throw new Error(error.message);
       return { items: (data || []).map(advertiserFromDb) };
     }
     if (user.role === "marketer") {
       const { data, error } = await supabase
         .from("pm_marketer_advertisers")
-        .select("advertiser:pm_advertisers(id,name,client_id,project_key,site_url,status,blocking_enabled,created_by),permission")
+        .select("advertiser:pm_advertisers(id,name,client_id,project_key,site_url,status,blocking_enabled,naver_account_id,created_by),permission")
         .eq("marketer_id", user.id);
       if (error) throw new Error(error.message);
       return { items: (data || []).filter((item) => item.advertiser).map((item) => ({ ...advertiserFromDb(item.advertiser), permission: item.permission })) };
     }
     const { data, error } = await supabase
       .from("pm_advertiser_users")
-      .select("advertiser:pm_advertisers(id,name,client_id,project_key,site_url,status,blocking_enabled,created_by),permission")
+      .select("advertiser:pm_advertisers(id,name,client_id,project_key,site_url,status,blocking_enabled,naver_account_id,created_by),permission")
       .eq("user_id", user.id);
     if (error) throw new Error(error.message);
     return { items: (data || []).filter((item) => item.advertiser).map((item) => ({ ...advertiserFromDb(item.advertiser), permission: item.permission })) };
@@ -699,6 +700,19 @@ export async function updateAdvertiserBlocking(advertiserId, blockingEnabled) {
   return { ok: true, advertiser: { id: advertiserId, blockingEnabled } };
 }
 
+export async function updateAdvertiserNaverAccount(advertiserId, naverAccountId) {
+  const mode = ensureServiceMode();
+  if (mode === "supabase") {
+    return apiRequest("/api/advertisers", {
+      method: "PATCH",
+      payload: { advertiser_id: advertiserId, naver_account_id: naverAccountId }
+    });
+  }
+  const target = mockAdvertisers.find((item) => item.id === advertiserId);
+  if (target) target.naverAccountId = naverAccountId;
+  return { ok: true, advertiser: { id: advertiserId, naverAccountId } };
+}
+
 function mapBlockedIpFromApi(item) {
   const blockType = item.block_type || item.method || "manual";
   const isActive = item.is_active ?? (!item.released_at && !item.ends_at);
@@ -774,7 +788,7 @@ export async function updateClickLogStatus(logId, clickStatus, reason) {
 export async function fetchAdvertisers() {
   const mode = ensureServiceMode();
   if (mode === "supabase") {
-    const { data, error } = await createSupabaseBrowserClient().from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,blocking_enabled,created_by").order("name");
+    const { data, error } = await createSupabaseBrowserClient().from("pm_advertisers").select("id,name,client_id,project_key,site_url,status,blocking_enabled,naver_account_id,created_by").order("name");
     if (error) throw new Error(error.message);
     return { items: (data || []).map(advertiserFromDb) };
   }

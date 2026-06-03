@@ -1,7 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import TrackingParameterWorkspace from "@/components/TrackingParameterWorkspace";
-
-export default function TrackingSettingsPage() {
-  return <TrackingParameterWorkspace />;
+export default function TrackingSettingsRedirectPage() {
+  redirect("/advertisers/tracking");
 }

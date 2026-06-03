@@ -81,7 +81,8 @@ const menuGroups = [
       { href: "/advertisers", label: "광고주 목록", icon: UsersRound, roles: ["admin", "marketer"] },
       { href: "/advertisers/create", label: "광고주/사이트 등록", icon: Target, roles: ["admin", "marketer"] },
       { href: "/advertisers/accounts", label: "광고주 로그인 계정 발급", icon: UserCircle, roles: ["admin", "marketer"] },
-      { href: "/advertisers/scripts", label: "설치 스크립트", icon: FileText, roles: ["admin", "marketer"] }
+      { href: "/advertisers/scripts", label: "설치 스크립트", icon: FileText, roles: ["admin", "marketer"] },
+      { href: "/advertisers/tracking", label: "추적 파라미터", icon: Link2, roles: ["admin", "marketer"] }
     ]
   },
   {
@@ -96,7 +97,6 @@ const menuGroups = [
     title: "설정",
     items: [
       { href: "/settings/account", label: "내 계정", icon: UserCircle, roles: ["admin", "marketer", "advertiser"] },
-      { href: "/settings/tracking", label: "추적 파라미터", icon: Link2, roles: ["admin", "marketer"] },
       { href: "/settings/policy", label: "운영 정책", icon: Settings, roles: ["admin", "marketer"] }
     ]
   }

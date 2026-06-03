@@ -265,9 +265,11 @@ notify pgrst, 'reload schema';
 지원 방식:
 
 - 메뉴명: `추적 파라미터`
-- 화면: `/settings/tracking`
+- 화면: `/advertisers/tracking`
+- 메뉴 위치: 좌측 `광고주 관리` 섹션
 - 지원 채널: 파워링크, 쇼핑검색광고, GFA
 - 생성 결과: 네이버 광고 관리자 캠페인 추적 URL/파라미터 등록 영역에 붙여넣을 문자열
+- 광고계정 저장: 광고주별 `pm_advertisers.naver_account_id`에 네이버 광고계정 식별값 저장
 - 목적: 실시간 차단이 아니라 유입 분석, 반복 클릭 분석, 의심 클릭 리포트
 
 파워링크 예시:
@@ -288,7 +290,14 @@ GFA 예시:
 ?pm_adv=광고주ID&pm_account=네이버광고계정ID&pm_channel=naver_gfa&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
 ```
 
-랜딩 URL에 이미 `?`가 있으면 생성기에서 `&` 시작을 선택합니다. 광고 등록 전에는 반드시 실제 랜딩 URL에 파라미터를 붙여 정상 접속과 `pm_click_logs` 저장 여부를 테스트합니다.
+추적 파라미터 화면은 두 가지 복사 문자열을 동시에 제공합니다.
+
+- 랜딩 URL에 `?`가 없으면 `?pm_adv=...`로 시작하는 값을 사용합니다.
+- 랜딩 URL에 이미 `?`가 있으면 `&pm_adv=...`로 시작하는 값을 사용합니다.
+
+광고 등록 전에는 반드시 실제 랜딩 URL에 파라미터를 붙여 정상 접속과 `pm_click_logs` 저장 여부를 테스트합니다.
+
+광고주 식별값은 화면 노출 부담을 줄이기 위해 `client_id`, `project_key`, `advertiser_id 앞 8자리` 순서로 사용합니다. DB 권한 조회와 실제 접근 제한은 계속 내부 `advertiser_id` 기준으로 처리합니다.
 
 저장 매핑:
 
