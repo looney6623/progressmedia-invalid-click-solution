@@ -8,6 +8,11 @@ function json(body, init = {}) {
   return NextResponse.json(body, init);
 }
 
+function isQaEnabled() {
+  if (process.env.NODE_ENV === "production") return false;
+  return process.env.DEV_QA_ENABLED === "true";
+}
+
 class FakeQuery {
   constructor(table, state) {
     this.table = table;
@@ -125,8 +130,8 @@ async function runScenario(name, scenario) {
 }
 
 export async function GET(request) {
-  if (!isServerLocalMode()) {
-    return json({ ok: false, mode: serverMode(), error: "DEV_ONLY_ROUTE" }, { status: 404 });
+  if (!isQaEnabled() || !isServerLocalMode()) {
+    return new Response(null, { status: 404 });
   }
 
   const scenarioName = new URL(request.url).searchParams.get("scenario");

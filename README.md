@@ -327,7 +327,20 @@ curl -X POST "$NEXT_PUBLIC_APP_URL/api/collect" \
 
 ## collect 판정 QA
 
-로컬 개발 모드(`PM_PROJECT_ENV=local` 또는 `development`)에서는 Supabase 없이 다음 dev API로 핵심 판정 로직을 확인합니다. 운영/Cloudtype 모드에서는 이 API가 `DEV_ONLY_ROUTE`로 막혀야 합니다.
+로컬 개발 모드(`PM_PROJECT_ENV=local` 또는 `development`)에서 `DEV_QA_ENABLED=true`를 명시한 경우에만 Supabase 없이 다음 dev API로 핵심 판정 로직을 확인합니다. `NODE_ENV=production`이면 항상 404를 반환하므로 Cloudtype 운영 배포에서는 기본 비활성입니다.
+
+로컬 실행 예시:
+
+```bash
+DEV_QA_ENABLED=true npm run dev
+```
+
+운영 차단 확인:
+
+```bash
+curl -i "$NEXT_PUBLIC_APP_URL/api/dev/collect-qa"
+# Cloudtype/production 기대값: HTTP/1.1 404
+```
 
 ```bash
 curl "$NEXT_PUBLIC_APP_URL/api/dev/collect-qa"
