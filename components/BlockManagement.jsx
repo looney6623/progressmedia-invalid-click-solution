@@ -10,6 +10,15 @@ const tabs = [
   { id: "history", label: "차단 해제 이력" }
 ];
 
+function advertiserMeta(advertiser) {
+  return [advertiser.clientId, advertiser.id].filter(Boolean).join(" · ");
+}
+
+function advertiserOptionLabel(advertiser) {
+  const meta = advertiserMeta(advertiser);
+  return meta ? `${advertiser.name} · ${meta}` : advertiser.name;
+}
+
 export default function BlockManagement({
   advertisers = [],
   manualBlocks = [],
@@ -78,9 +87,13 @@ export default function BlockManagement({
 
   async function blockFromLog(log) {
     setError("");
+    if (!log.id && !log.advertiserId) {
+      setError("광고주 ID가 없는 로그는 실제 차단으로 등록할 수 없습니다.");
+      return;
+    }
     const result = await onAddBlock({
       logId: log.id,
-      advertiserId: log.advertiserId || advertisers.find((item) => item.name === log.advertiser)?.id || "",
+      advertiserId: log.advertiserId || "",
       clientId: log.clientId,
       ipHash: log.ipHash,
       ipMasked: log.ipMasked || log.ip,
@@ -175,6 +188,7 @@ export default function BlockManagement({
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h3 className="text-sm font-bold text-white">{advertiser.name}</h3>
+                      <p className="mt-1 text-xs text-slate-500">{advertiserMeta(advertiser) || "광고주 ID 없음"}</p>
                       <p className="mt-1 text-xs text-slate-500">자동 판정 상태: {blockingEnabled ? "ON" : "긴급 중지"}</p>
                     </div>
                     <button
@@ -258,7 +272,10 @@ export default function BlockManagement({
                 {candidateLogs.map((log) => (
                   <tr key={log.id}>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-400">{log.dateTime}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-white">{log.advertiser}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-white">
+                      {log.advertiser}
+                      <div className="mt-1 font-mono text-[11px] text-slate-500">{log.advertiserId || "-"}</div>
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-400">{log.clientId || "-"}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-300">{log.ipMasked || log.ip}</td>
                     <td className="whitespace-nowrap px-4 py-3"><StatusBadge status={log.status} /></td>
@@ -303,7 +320,7 @@ export default function BlockManagement({
                 <span className="text-xs font-semibold text-slate-500">광고주</span>
                 <select value={form.advertiserId} onChange={(event) => update("advertiserId", event.target.value)} className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-200 outline-none focus:border-brand">
                   <option value="">광고주 선택</option>
-                  {advertisers.map((advertiser) => <option key={advertiser.id} value={advertiser.id}>{advertiser.name}</option>)}
+                  {advertisers.map((advertiser) => <option key={advertiser.id} value={advertiser.id}>{advertiserOptionLabel(advertiser)}</option>)}
                 </select>
               </label>
               <input value={form.rawIp} onChange={(event) => update("rawIp", event.target.value)} placeholder="차단할 IP 원문" className="h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-brand" />

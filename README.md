@@ -325,6 +325,71 @@ curl -X POST "$NEXT_PUBLIC_APP_URL/api/collect" \
 - 저장 컬럼: `ip_hash`, `ip_masked`, `user_agent`, `page_url`, `referrer`, UTM, `click_status`, `risk_score`, `reason`
 - IP 원문은 저장하지 않음
 
+## collect 판정 QA
+
+로컬 개발 모드(`PM_PROJECT_ENV=local` 또는 `development`)에서는 Supabase 없이 다음 dev API로 핵심 판정 로직을 확인합니다. 운영/Cloudtype 모드에서는 이 API가 `DEV_ONLY_ROUTE`로 막혀야 합니다.
+
+```bash
+curl "$NEXT_PUBLIC_APP_URL/api/dev/collect-qa"
+curl "$NEXT_PUBLIC_APP_URL/api/dev/collect-qa?scenario=blocking_disabled_repeat"
+curl "$NEXT_PUBLIC_APP_URL/api/dev/collect-qa?scenario=blocking_disabled_active_block"
+```
+
+기대 결과:
+
+- `blocking_disabled_repeat`: `blocking_enabled=false`, 최근 5회 조건, `stay_time=1`, `page_count=0`이어도 `click_status=normal`, `applied_rules=[]`, `reason`에 `자동 차단 중지 상태` 포함
+- `blocking_disabled_active_block`: `blocking_enabled=false`여도 활성 `pm_blocked_ips.is_active=true`가 있으면 `click_status=blocked`, `reason`에 `활성 차단 IP` 포함
+- `blocking_enabled_repeat_block`: `blocking_enabled=true`이고 같은 IP 기준 10분 내 5회째이면 `repeat_click_block` 규칙으로 `blocked`
+
+운영/Cloudtype에서 실제 클릭 수집으로 검증할 때는 테스트 광고주의 `client_id`, `project_key`를 넣고 같은 네트워크/IP에서 5회 반복 호출합니다. `page_count=0`과 `stay_time=1`은 무이동/짧은 체류 규칙 검증용입니다.
+
+```bash
+for i in 1 2 3 4 5; do
+  curl -s -X POST "$NEXT_PUBLIC_APP_URL/api/collect" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"client_id\":\"pm-client\",
+      \"project_key\":\"pk-project\",
+      \"visitor_id\":\"v-repeat-$i\",
+      \"session_id\":\"s-repeat-$i\",
+      \"page_url\":\"https://advertiser.example/qa-repeat\",
+      \"stay_time\":1,
+      \"page_count\":0,
+      \"utm_source\":\"qa\",
+      \"utm_medium\":\"collect\",
+      \"utm_campaign\":\"blocking-enabled-check\"
+    }"
+  echo
+done
+```
+
+DB 확인 SQL:
+
+```sql
+select id, name, blocking_enabled
+from public.pm_advertisers
+where client_id = 'pm-client';
+
+select created_at, advertiser_id, ip_masked, click_status, risk_score, recent_count, reason, applied_rules
+from public.pm_click_logs
+where client_id = 'pm-client'
+order by created_at desc
+limit 10;
+
+select advertiser_id, ip_masked, reason, block_type, source, is_active
+from public.pm_blocked_ips
+where client_id = 'pm-client'
+order by created_at desc
+limit 10;
+```
+
+운영 체크 포인트:
+
+- `pm_advertisers.blocking_enabled=false`이면 반복 클릭, `stay_time<=3`, `page_count=0`이 `suspicious/blocked`로 승격되지 않아야 합니다.
+- 같은 상태에서도 활성 `pm_blocked_ips.is_active=true` IP는 계속 `blocked`여야 합니다.
+- 일반 중지 로그의 `reason`은 `자동 차단 중지 상태`, 활성 차단 IP 로그의 `reason`은 `활성 차단 IP`로 구분되어야 합니다.
+- 동일 광고주명이 여러 개 있어도 UI와 API 요청은 `advertiser_id` 기준으로 상태 표시/수정되어야 합니다.
+
 ## /api/events
 
 `/api/events`는 체류시간과 전환 이벤트를 수신합니다.

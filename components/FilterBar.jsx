@@ -5,6 +5,19 @@ const mediaOptions = ["전체", "네이버 검색", "구글 검색", "메타", "
 const statusOptions = ["전체", "정상", "의심", "차단"];
 const dateOptions = ["오늘", "최근 7일", "최근 30일"];
 
+function optionValue(option) {
+  return typeof option === "string" ? option : option.value;
+}
+
+function optionLabel(option) {
+  return typeof option === "string" ? option : option.label;
+}
+
+function advertiserLabel(advertiser) {
+  const suffix = advertiser.clientId || advertiser.projectKey || advertiser.id;
+  return suffix ? `${advertiser.name} · ${suffix}` : advertiser.name;
+}
+
 function FilterSelect({ label, value, onChange, options }) {
   return (
     <label className="flex min-w-0 flex-col gap-1.5">
@@ -15,8 +28,8 @@ function FilterSelect({ label, value, onChange, options }) {
         className="h-10 rounded-md border border-line bg-ink px-3 text-sm text-slate-200 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
       >
         {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
+          <option key={optionValue(option)} value={optionValue(option)}>
+            {optionLabel(option)}
           </option>
         ))}
       </select>
@@ -25,7 +38,10 @@ function FilterSelect({ label, value, onChange, options }) {
 }
 
 export default function FilterBar({ filters, setFilters, advertiserOptions }) {
-  const advertisers = ["전체", ...advertiserOptions.map((item) => item.name)];
+  const advertisers = [
+    { value: "전체", label: "전체" },
+    ...advertiserOptions.map((item) => ({ value: item.id || item.name, label: advertiserLabel(item) }))
+  ];
 
   return (
     <Card className="p-5 no-print">

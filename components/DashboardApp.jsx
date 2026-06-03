@@ -72,6 +72,19 @@ function EmptyAssignment({ user, onSignOut }) {
   );
 }
 
+function blockIdentity(block) {
+  const scopedIp = block.ipHash || block.ipMasked || block.ip || "";
+  if (!scopedIp) return block.id || "";
+  return `${block.advertiserId || ""}:${scopedIp}`;
+}
+
+function isSameBlock(left, right) {
+  if (left.id && right.id) return left.id === right.id;
+  const leftIdentity = blockIdentity(left);
+  const rightIdentity = blockIdentity(right);
+  return Boolean(leftIdentity && rightIdentity && leftIdentity === rightIdentity);
+}
+
 export default function DashboardApp() {
   const [authReady, setAuthReady] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -149,12 +162,17 @@ export default function DashboardApp() {
     return () => observer.disconnect();
   }, [user?.role]);
 
+  const allowedAdvertiserIds = useMemo(() => myAdvertisers.map((advertiser) => advertiser.id).filter(Boolean), [myAdvertisers]);
   const allowedAdvertiserNames = useMemo(() => myAdvertisers.map((advertiser) => advertiser.name), [myAdvertisers]);
   const permissionLogs = useMemo(() => {
     if (!user) return [];
     if (user.role === "admin") return clickLogs;
-    return clickLogs.filter((log) => allowedAdvertiserNames.includes(log.advertiser));
-  }, [allowedAdvertiserNames, user]);
+    return clickLogs.filter((log) => (
+      log.advertiserId
+        ? allowedAdvertiserIds.includes(log.advertiserId)
+        : allowedAdvertiserNames.includes(log.advertiser)
+    ));
+  }, [allowedAdvertiserIds, allowedAdvertiserNames, user]);
   const filteredLogs = useMemo(() => filterClicks(permissionLogs, filters), [permissionLogs, filters]);
   const summary = useMemo(() => summarizeClicks(filteredLogs), [filteredLogs]);
   const advertiserStats = useMemo(() => getAdvertiserStats(filteredLogs), [filteredLogs]);
@@ -196,7 +214,7 @@ export default function DashboardApp() {
   }
 
   function addManualBlock(item) {
-    setManualBlocks((prev) => [item, ...prev.filter((block) => block.ip !== item.ip)]);
+    setManualBlocks((prev) => [item, ...prev.filter((block) => !isSameBlock(block, item))]);
   }
 
   function removeManualBlock(ip) {

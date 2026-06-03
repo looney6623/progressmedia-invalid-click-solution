@@ -40,6 +40,19 @@ const initialFilters = {
   query: ""
 };
 
+function blockIdentity(block) {
+  const scopedIp = block.ipHash || block.ipMasked || block.ip || "";
+  if (!scopedIp) return block.id || "";
+  return `${block.advertiserId || ""}:${scopedIp}`;
+}
+
+function isSameBlock(left, right) {
+  if (left.id && right.id) return left.id === right.id;
+  const leftIdentity = blockIdentity(left);
+  const rightIdentity = blockIdentity(right);
+  return Boolean(leftIdentity && rightIdentity && leftIdentity === rightIdentity);
+}
+
 export function AppStateProvider({ children }) {
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -174,7 +187,7 @@ export function AppStateProvider({ children }) {
       return result;
     }
     const block = result.block || item;
-    setManualBlocks((prev) => [block, ...prev.filter((existing) => existing.ip !== block.ip)]);
+    setManualBlocks((prev) => [block, ...prev.filter((existing) => !isSameBlock(existing, block))]);
     return result;
   }
 
@@ -264,13 +277,18 @@ export function AppStateProvider({ children }) {
     await refreshAccess();
   }
 
+  const allowedAdvertiserIds = useMemo(() => myAdvertisers.map((advertiser) => advertiser.id).filter(Boolean), [myAdvertisers]);
   const allowedAdvertiserNames = useMemo(() => myAdvertisers.map((advertiser) => advertiser.name), [myAdvertisers]);
 
   const permissionLogs = useMemo(() => {
     if (!user) return [];
     if (user.role === "admin") return sourceLogs;
-    return sourceLogs.filter((log) => allowedAdvertiserNames.includes(log.advertiser));
-  }, [allowedAdvertiserNames, sourceLogs, user]);
+    return sourceLogs.filter((log) => (
+      log.advertiserId
+        ? allowedAdvertiserIds.includes(log.advertiserId)
+        : allowedAdvertiserNames.includes(log.advertiser)
+    ));
+  }, [allowedAdvertiserIds, allowedAdvertiserNames, sourceLogs, user]);
 
   const filteredLogs = useMemo(() => filterClicks(permissionLogs, filters), [permissionLogs, filters]);
   const summary = useMemo(() => summarizeClicks(filteredLogs), [filteredLogs]);

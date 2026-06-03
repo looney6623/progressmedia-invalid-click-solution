@@ -17,6 +17,13 @@ function readValue(body, snakeKey, camelKey) {
   return body[snakeKey] ?? body[camelKey] ?? "";
 }
 
+function readNumber(body, snakeKey, camelKey, fallback = null) {
+  const value = body[snakeKey] ?? body[camelKey];
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders });
 }
@@ -64,8 +71,8 @@ export async function POST(request) {
   if (!advertiser) return json({ ok: false, error: "invalid client_id or project_key" }, { status: 403 });
   if (!ipHash) return json({ ok: false, error: "IP_HASH_SALT 설정이 필요합니다." }, { status: 500 });
 
-  const stayTime = typeof body.stay_time === "number" ? body.stay_time : null;
-  const pageCount = Number(readValue(body, "page_count", "pageCount") || 1);
+  const stayTime = readNumber(body, "stay_time", "stayTime", null);
+  const pageCount = readNumber(body, "page_count", "pageCount", 1);
   const detection = await detectInvalidClick({
     supabase,
     advertiserId: advertiser.id,
