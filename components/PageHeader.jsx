@@ -1,4 +1,4 @@
-export default function PageHeader({ eyebrow = "INVALID CLICK PREVENTION", title, description, actions }) {
+export default function PageHeader({ eyebrow = "무효클릭 관리", title, description, actions }) {
   return (
     <header className="border-b border-line bg-ink/88 backdrop-blur no-print">
       <div className="flex flex-col gap-4 px-5 py-5 md:flex-row md:items-center md:justify-between lg:px-8">

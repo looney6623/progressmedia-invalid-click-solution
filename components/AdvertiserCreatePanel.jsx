@@ -78,7 +78,7 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
     <Card id="advertiser-create" className="scroll-mt-24">
       <SectionTitle icon={Building2} title="광고주/사이트 등록" />
       <SectionDescription>
-        광고주 기본 정보와 사이트 URL을 등록하고 추적용 client_id, project_key를 발급합니다. 로그인 계정은 다음 단계에서 별도로 발급합니다.
+        광고주 기본 정보와 사이트 URL을 등록하고 설치에 필요한 고객 코드와 설치 키를 발급합니다. 로그인 계정은 다음 단계에서 별도로 발급합니다.
       </SectionDescription>
       {error && <div className="mx-5 mt-4 rounded-md border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
       <div className="grid gap-5 p-5 xl:grid-cols-[0.9fr_1.1fr]">
@@ -115,8 +115,8 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
               onChange={(event) => updateField("status", event.target.value)}
               className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100 outline-none focus:border-brand disabled:opacity-60"
             >
-              <option value="active">active</option>
-              <option value="inactive">inactive</option>
+              <option value="active">운영 중</option>
+              <option value="inactive">중지</option>
             </select>
           </label>
           <button disabled={loading} className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-ink transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60">
@@ -135,8 +135,8 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
               <div className="grid gap-2 sm:grid-cols-2">
                 <Info label="광고주명" value={created.advertiser.name} />
                 <Info label="사이트 URL" value={created.advertiser.siteUrl} />
-                <Info label="client_id" value={created.advertiser.clientId} onCopy={() => copyText("client_id", created.advertiser.clientId)} />
-                <Info label="project_key" value={created.advertiser.projectKey} onCopy={() => copyText("project_key", created.advertiser.projectKey)} />
+                <Info label="고객 코드" value={created.advertiser.clientId} onCopy={() => copyText("고객 코드", created.advertiser.clientId)} />
+                <Info label="설치 키" value={created.advertiser.projectKey} onCopy={() => copyText("설치 키", created.advertiser.projectKey)} />
               </div>
               <pre className="max-h-44 overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-300">{created.installScript}</pre>
               <div className="flex flex-wrap items-center gap-2">
@@ -152,7 +152,7 @@ export default function AdvertiserCreatePanel({ currentUser, onCreateAdvertiser 
             </div>
           ) : (
             <p className="text-sm leading-6 text-slate-500">
-              등록이 완료되면 이번 광고주의 추적 키와 설치 스크립트가 표시됩니다. 이 단계에서는 광고주 로그인 계정을 만들지 않습니다.
+              등록이 완료되면 이번 광고주의 설치 코드가 표시됩니다. 이 단계에서는 광고주 로그인 계정을 만들지 않습니다.
             </p>
           )}
         </div>

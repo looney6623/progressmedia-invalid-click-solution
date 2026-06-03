@@ -265,7 +265,7 @@ export default function DashboardApp() {
         <header className="sticky top-0 z-10 border-b border-line bg-ink/88 backdrop-blur no-print">
           <div className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between lg:px-8">
             <div>
-              <p className="text-xs font-semibold text-brand">INVALID CLICK PREVENTION</p>
+              <p className="text-xs font-semibold text-brand">무효클릭 관리</p>
               <h1 className="mt-1 text-xl font-bold tracking-normal text-white md:text-2xl">프로그레스미디어 무효클릭차단 솔루션</h1>
               <p className="mt-1 text-xs text-slate-500">{user.name} · {user.email}</p>
             </div>

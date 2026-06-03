@@ -110,21 +110,31 @@
     post(collectUrl, basePayload({ event_type: "page_load" }), false);
 
     var sentFinal = false;
-    function sendStayTime(eventType) {
-      if (sentFinal && eventType !== "conversion") return;
-      if (eventType !== "conversion") sentFinal = true;
+    function sendStayTime(eventType, final) {
+      if (sentFinal) return;
+      if (final) sentFinal = true;
       post(eventsUrl, basePayload({
         event_type: eventType || "stay_time",
         stay_time: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
         duration_ms: Math.max(0, Date.now() - startedAt)
-      }), true);
+      }), Boolean(final));
     }
 
+    window.setTimeout(function () {
+      sendStayTime("stay_time", false);
+    }, 5000);
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "hidden") {
+        sendStayTime("visibility_hidden", true);
+      }
+    });
+
     window.addEventListener("pagehide", function () {
-      sendStayTime("stay_time");
+      sendStayTime("stay_time", true);
     });
     window.addEventListener("beforeunload", function () {
-      sendStayTime("stay_time");
+      sendStayTime("stay_time", true);
     });
 
     window.pmClickShield = window.pmClickShield || {};

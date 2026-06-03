@@ -177,7 +177,7 @@ export default function BlockManagement({
         <Card>
           <SectionTitle icon={SlidersHorizontal} title="자동 판정 규칙" />
           <SectionDescription>
-            ON/OFF와 threshold는 `pm_block_rules`에 저장됩니다. 긴급 자동 차단 중지는 `pm_advertisers.blocking_enabled=false`로 저장되며, 활성 수동 차단 IP는 계속 유지됩니다.
+            광고주별 자동 판정 기준을 켜거나 끄고 반복 클릭 기준을 조정합니다. 긴급 중지 중에도 이미 등록된 차단 IP는 계속 차단됩니다.
           </SectionDescription>
           <div className="space-y-5 p-5">
             {advertisers.map((advertiser) => {
@@ -259,13 +259,13 @@ export default function BlockManagement({
         <Card>
           <SectionTitle icon={ShieldAlert} title="차단 판정 로그" right={<span className="text-xs text-slate-500">차단 판정 {number(blockedLogs.length)} · 의심 {number(suspiciousLogs.length)}</span>} />
           <SectionDescription>
-            이 목록은 `pm_click_logs.click_status` 판정 로그입니다. 실제 해제 대상은 아니며, 필요하면 실제 차단 등록 또는 로그 상태 정정을 수행합니다.
+            이 목록은 차단 또는 의심으로 분류된 클릭 기록입니다. 실제 해제 대상은 아니며, 필요하면 실제 차단 등록 또는 상태 정정을 수행합니다.
           </SectionDescription>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1180px] text-left text-sm">
               <thead className="bg-panelSoft text-xs uppercase text-slate-500">
                 <tr>
-                  {["시간", "광고주", "client_id", "ip_masked", "상태", "위험도", "최근 클릭", "적용 규칙", "판정 사유", "작업"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
+                  {["시간", "광고주", "고객 코드", "IP", "상태", "위험도", "최근 클릭", "적용 기준", "판정 사유", "작업"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -303,10 +303,10 @@ export default function BlockManagement({
         <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
           <Card>
             <SectionTitle icon={Ban} title="활성 차단 IP" right={<span className="text-xs text-slate-500">{number(manualBlocks.length)}개</span>} />
-            <SectionDescription>`pm_blocked_ips.is_active=true`인 실제 차단 row입니다. 이 목록에서만 차단 해제가 가능합니다.</SectionDescription>
+            <SectionDescription>현재 실제로 차단 중인 IP 목록입니다. 차단 해제는 이 목록에서만 가능합니다.</SectionDescription>
             <div className="flex items-center justify-between border-b border-line px-5 py-3">
               <button onClick={() => setShowHash((prev) => !prev)} className="rounded-md border border-line bg-panelSoft px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white">
-                ip_hash {showHash ? "숨기기" : "보기"}
+                식별값 {showHash ? "숨기기" : "보기"}
               </button>
             </div>
             <BlockTable blocks={manualBlocks} showHash={showHash} onRelease={confirmRelease} />
@@ -314,7 +314,7 @@ export default function BlockManagement({
 
           <Card>
             <SectionTitle icon={Plus} title="직접 IP 차단" />
-            <SectionDescription>IP 원문은 DB에 저장하지 않습니다. 서버 API가 서버 전용 salt로 `ip_hash`를 생성하고 `ip_masked`만 저장합니다.</SectionDescription>
+            <SectionDescription>입력한 IP 원문은 저장하지 않고, 서버에서 식별용 값과 가려진 IP만 저장합니다.</SectionDescription>
             <form onSubmit={submitBlock} className="space-y-3 p-5">
               <label className="block">
                 <span className="text-xs font-semibold text-slate-500">광고주</span>
@@ -359,7 +359,7 @@ function BlockTable({ blocks, showHash, onRelease, released = false }) {
       <table className="w-full min-w-[900px] text-left text-sm">
         <thead className="bg-panelSoft text-xs uppercase text-slate-500">
           <tr>
-            {["광고주", "client_id", "ip_masked", "차단 사유", "유형", released ? "해제일" : "생성일", "관리"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
+            {["광고주", "고객 코드", "IP", "차단 사유", "유형", released ? "해제일" : "생성일", "관리"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
           </tr>
         </thead>
         <tbody className="divide-y divide-line">

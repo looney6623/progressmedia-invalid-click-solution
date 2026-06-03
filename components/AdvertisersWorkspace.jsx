@@ -134,7 +134,7 @@ function AdvertiserList({ advertisers, advertiserUsers, onIssueAccount }) {
         <table className="w-full min-w-[1080px] text-left text-sm">
           <thead className="bg-panelSoft text-xs uppercase text-slate-500">
             <tr>
-              {["광고주명", "사이트 URL", "client_id", "project_key", "상태", "로그인 계정 수", "설치 스크립트 상태"].map((head) => (
+              {["광고주명", "사이트 URL", "고객 코드", "설치 키", "상태", "로그인 계정 수", "설치 스크립트 상태"].map((head) => (
                 <th key={head} className="px-5 py-3 font-semibold">{head}</th>
               ))}
             </tr>
@@ -150,7 +150,7 @@ function AdvertiserList({ advertisers, advertiserUsers, onIssueAccount }) {
                   <td className="px-5 py-4 font-mono text-xs text-slate-300">{advertiser.clientId}</td>
                   <td className="px-5 py-4 font-mono text-xs text-slate-300">{advertiser.projectKey}</td>
                   <td className="px-5 py-4">
-                    <StatusBadge status={advertiser.status === "active" ? "정상" : "차단"} label={advertiser.status} />
+                    <StatusBadge status={advertiser.status === "active" ? "정상" : "차단"} label={advertiser.status === "active" ? "운영 중" : "중지"} />
                   </td>
                   <td className="px-5 py-4">
                     {accountCount > 0 ? (

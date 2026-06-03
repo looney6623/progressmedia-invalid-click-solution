@@ -39,7 +39,7 @@ export default function InstallScriptPanel({ advertisers = [] }) {
         {[
           ["1", "테스트 페이지 1개에 먼저 삽입", "전체 사이트 적용 전 특정 테스트 페이지에 먼저 설치하고 사이트 깨짐 여부를 확인합니다."],
           ["2", "하단 스크립트 영역에 삽입", "일반 HTML은 </body> 바로 위, 카페24/아임웹/워드프레스는 공통 하단 스크립트 또는 Footer Script 영역에 삽입합니다."],
-          ["3", "수집 여부 확인", "UTM 테스트 URL로 접속한 뒤 Supabase pm_click_logs 저장 여부와 대시보드 로그 노출을 확인합니다."]
+          ["3", "수집 여부 확인", "테스트 URL로 접속한 뒤 대시보드에 방문 기록이 보이는지 확인합니다."]
         ].map(([step, title, body]) => (
           <div key={step} className="rounded-md border border-line bg-panelSoft p-4">
             <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-brand text-xs font-bold text-ink">{step}</span>
@@ -59,8 +59,8 @@ export default function InstallScriptPanel({ advertisers = [] }) {
 {`<script
   async
   src="${trackerUrl}"
-  data-client-id="광고주 client_id"
-  data-project-key="광고주 project_key">
+  data-client-id="광고주 고객 코드"
+  data-project-key="광고주 설치 키">
 </script>`}
           </pre>
         </div>
@@ -68,7 +68,7 @@ export default function InstallScriptPanel({ advertisers = [] }) {
           <p className="text-sm font-semibold text-white">UTM 테스트 URL</p>
           <p className="mt-2 text-xs leading-5 text-slate-500">설치 후 광고주 테스트 페이지 URL 뒤에 아래 파라미터를 붙여 접속합니다.</p>
           <code className="mt-3 block break-all rounded bg-ink p-3 text-xs text-brand">{utmExample}</code>
-          <p className="mt-3 text-xs leading-5 text-slate-500">접속 후 5초 이상 머물렀다가 페이지를 닫거나 이동하면 `/api/events`로 체류시간이 전송됩니다.</p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">접속 후 5초 이상 머물렀다가 페이지를 닫거나 이동하면 체류시간이 전송됩니다.</p>
         </div>
       </div>
 
@@ -86,8 +86,8 @@ export default function InstallScriptPanel({ advertisers = [] }) {
             <div key={`${item.advertiser}-${item.clientId || "missing"}`} className="grid gap-4 px-5 py-5 xl:grid-cols-[0.65fr_1.4fr_0.45fr_0.55fr] xl:items-center">
               <div>
                 <p className="text-sm font-semibold text-white">{item.advertiser}</p>
-                <p className="mt-1 font-mono text-xs text-slate-500">{item.clientId || "client_id 없음"}</p>
-                <p className="mt-1 font-mono text-xs text-slate-600">{item.projectKey || "project_key 없음"}</p>
+                <p className="mt-1 font-mono text-xs text-slate-500">{item.clientId || "고객 코드 없음"}</p>
+                <p className="mt-1 font-mono text-xs text-slate-600">{item.projectKey || "설치 키 없음"}</p>
               </div>
               {installable ? (
                 <pre className="max-h-36 overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-300">
@@ -96,7 +96,7 @@ export default function InstallScriptPanel({ advertisers = [] }) {
               ) : (
                 <div className="flex items-center gap-2 rounded-md border border-warn/30 bg-warn/10 p-3 text-sm text-warn">
                   <AlertCircle size={16} />
-                  client_id/project_key가 없어 설치할 수 없습니다. 광고주를 다시 발급하거나 DB 값을 확인하세요.
+                  설치 코드 발급 정보가 없어 설치할 수 없습니다. 광고주 정보를 다시 발급해 주세요.
                 </div>
               )}
               <StatusBadge status={item.status} label={installable ? item.status : "설치 불가"} />
@@ -116,7 +116,7 @@ export default function InstallScriptPanel({ advertisers = [] }) {
         })}
         {scripts.length === 0 && (
           <div className="px-5 py-10 text-center text-sm text-slate-500">
-            설치 스크립트를 표시할 광고주가 없습니다. 광고주를 먼저 생성하면 client_id와 project_key가 발급됩니다.
+            설치 스크립트를 표시할 광고주가 없습니다. 광고주를 먼저 생성하면 설치 코드가 발급됩니다.
           </div>
         )}
       </div>

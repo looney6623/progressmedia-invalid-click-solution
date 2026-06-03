@@ -63,7 +63,7 @@ export default function AnalysisPage() {
                 <span className="text-slate-400">{item.count}회 · 차단 {item.blocked}회</span>
               </div>
             ))}
-            {repeatedIps.length === 0 && <p className="text-sm text-slate-500">반복 클릭 IP가 아직 없습니다. 화면에는 ip_masked만 표시합니다.</p>}
+            {repeatedIps.length === 0 && <p className="text-sm text-slate-500">반복 클릭 IP가 아직 없습니다. IP는 일부를 가린 형태로만 표시합니다.</p>}
           </div>
         </div>
       </div>

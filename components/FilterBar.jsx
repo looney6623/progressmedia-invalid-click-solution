@@ -61,7 +61,7 @@ export default function FilterBar({ filters, setFilters, advertiserOptions }) {
             <input
               value={filters.query}
               onChange={(event) => setFilters((prev) => ({ ...prev, query: event.target.value }))}
-              placeholder="IP, 광고주명, referrer, UTM, 키워드"
+              placeholder="IP, 광고주명, 유입 경로, 캠페인, 키워드"
               className="min-w-0 flex-1 bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-600"
             />
           </span>

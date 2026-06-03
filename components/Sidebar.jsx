@@ -70,8 +70,8 @@ const menuGroups = [
     title: "로그 분석",
     items: [
       { href: "/logs/all", label: "전체 로그", icon: FileText, roles: ["admin", "marketer"] },
-      { href: "/logs/referrers", label: "Referrer URL", icon: Link2, roles: ["admin", "marketer"] },
-      { href: "/logs/utm", label: "UTM 분석", icon: BarChart3, roles: ["admin", "marketer"] },
+      { href: "/logs/referrers", label: "유입 경로", icon: Link2, roles: ["admin", "marketer"] },
+      { href: "/logs/utm", label: "캠페인 분석", icon: BarChart3, roles: ["admin", "marketer"] },
       { href: "/logs/keywords", label: "검색어/키워드", icon: Search, roles: ["admin", "marketer"] }
     ]
   },

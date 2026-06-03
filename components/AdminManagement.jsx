@@ -8,7 +8,7 @@ export default function AdminManagement({ teamMembers, advertisers, assignments,
     <div className="grid gap-5 xl:grid-cols-2">
       <Card id="team" className="scroll-mt-24">
         <SectionTitle icon={Users} title="직원 계정 관리" />
-        <SectionDescription>Supabase Auth의 사용자와 `pm_profiles`를 연결해 관리자/마케터 역할을 관리하는 화면 초안입니다.</SectionDescription>
+        <SectionDescription>직원 계정의 역할과 사용 가능 상태를 관리합니다.</SectionDescription>
         <div className="divide-y divide-line">
           {teamMembers.map((member) => (
             <div key={member.id} className="flex items-center justify-between gap-3 px-5 py-4">
@@ -55,7 +55,7 @@ export default function AdminManagement({ teamMembers, advertisers, assignments,
                         onClick={() => onRemove(item.id)}
                         className="rounded border border-line bg-ink px-2 py-1 text-xs text-slate-300 hover:text-danger"
                       >
-                        {advertiser?.name || item.advertiserId} · {item.permission} 해제
+                        {advertiser?.name || "광고주"} · 배정 해제
                       </button>
                     );
                   })}

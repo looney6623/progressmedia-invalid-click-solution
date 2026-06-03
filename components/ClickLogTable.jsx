@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { Eye, RadioTower, RefreshCw, X } from "lucide-react";
 import { Card, SectionDescription, SectionTitle, StatusBadge } from "@/components/ui";
-import { currency } from "@/lib/clickData";
-import { number } from "@/lib/format";
+import { currency, number } from "@/lib/format";
 
 function maskIp(ip) {
   const parts = ip.split(".");
@@ -30,7 +29,7 @@ export default function ClickLogTable({ logs, onRefresh }) {
         right={<span className="text-xs text-slate-500">총 {number(logs.length)}건</span>}
       />
       <SectionDescription>
-        유입 클릭을 시간, 매체, IP, 체류 행동 기준으로 확인합니다. 위험도 정렬과 IP 마스킹을 켜고 운영 검수 화면처럼 사용할 수 있습니다.
+        유입 클릭을 시간, 매체, IP, 체류 행동 기준으로 확인합니다. 위험도가 높은 순서로 정렬하거나 IP 일부를 가려서 볼 수 있습니다.
       </SectionDescription>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -68,7 +67,7 @@ export default function ClickLogTable({ logs, onRefresh }) {
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead className="bg-panelSoft text-xs uppercase text-slate-500">
             <tr>
-          {["시간", "광고주", "client_id", "IP", "페이지 URL", "유입/referrer", "UTM", "체류", "최근 클릭", "위험도", "상태", "판정 사유", "상세"].map((head) => (
+          {["시간", "광고주", "고객 코드", "IP", "방문 페이지", "유입 경로", "캠페인 정보", "체류", "최근 클릭", "위험도", "상태", "판정 사유", "상세"].map((head) => (
                 <th key={head} className="px-4 py-3 font-semibold">
                   {head}
                 </th>
@@ -85,7 +84,7 @@ export default function ClickLogTable({ logs, onRefresh }) {
                 <td className="max-w-[260px] truncate px-4 py-3 text-slate-300">{log.landingPage}</td>
                 <td className="max-w-[220px] truncate px-4 py-3 text-slate-300">{log.referrer || log.media}</td>
                 <td className="max-w-[220px] truncate px-4 py-3 text-slate-400">{log.utm || "-"}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-300">{log.dwellSeconds}s</td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-300">{Number(log.dwellSeconds || 0) > 0 ? `${number(log.dwellSeconds)}초` : "-"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-300">{log.clickCountIn10Min || "-"}</td>
                 <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-100">{log.riskScore}</td>
                 <td className="whitespace-nowrap px-4 py-3">
@@ -127,19 +126,19 @@ export default function ClickLogTable({ logs, onRefresh }) {
             <div className="grid gap-3 p-5 sm:grid-cols-2">
               {[
                 ["광고주", selectedLog.advertiser],
-                ["client_id", selectedLog.clientId || "-"],
+                ["고객 코드", selectedLog.clientId || "-"],
                 ["캠페인", selectedLog.campaign],
                 ["키워드", selectedLog.keyword],
                 ["매체", selectedLog.media],
                 ["IP", selectedLog.ip],
-                ["referrer", selectedLog.referrer || "-"],
+                ["유입 경로", selectedLog.referrer || selectedLog.media || "-"],
                 ["UTM", selectedLog.utm || "-"],
                 ["지역/기기", `${selectedLog.region} · ${selectedLog.device}`],
                 ["랜딩 페이지", selectedLog.landingPage],
                 ["브라우저", selectedLog.userAgent],
-                ["체류/이동", `${selectedLog.dwellSeconds}s · ${selectedLog.pageViews}회`],
+                ["체류/이동", `${Number(selectedLog.dwellSeconds || 0) > 0 ? `${number(selectedLog.dwellSeconds)}초` : "-"} · ${selectedLog.pageViews}회`],
                 ["10분 내 클릭", `${selectedLog.clickCountIn10Min}회`],
-                ["CPC", currency.format(selectedLog.cpc)],
+                ["클릭 비용", currency(selectedLog.cpc)],
                 ["위험도", `${selectedLog.riskScore}점`]
               ].map(([label, value]) => (
                 <div key={label} className="rounded-md bg-panelSoft p-3">

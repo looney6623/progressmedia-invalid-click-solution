@@ -2,9 +2,8 @@ import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Download, FileText, Printer } from "lucide-react";
 import { Card, SectionDescription, SectionTitle, TooltipBox, chartColors } from "@/components/ui";
-import { currency } from "@/lib/clickData";
 import { downloadClickReportCsv } from "@/lib/exportCsv";
-import { number, percent } from "@/lib/format";
+import { currency, number, percent } from "@/lib/format";
 
 const dateOptions = ["오늘", "어제", "최근 7일", "최근 30일", "직접 날짜 범위"];
 
@@ -163,7 +162,7 @@ export default function AdvertiserReport({ logs, advertisers = [], conversionEve
           </div>
         }
       />
-      <SectionDescription>권한 범위 내 광고주의 클릭 로그, 차단 IP, 전환 이벤트를 기준으로 운영 리포트를 생성합니다.</SectionDescription>
+      <SectionDescription>선택한 광고주의 클릭 현황, 차단 내역, 전환 성과를 기준으로 운영 리포트를 생성합니다.</SectionDescription>
 
       <div className="grid gap-3 border-b border-line p-5 no-print lg:grid-cols-[1.2fr_1fr_1fr_1fr]">
         <label className="block">
@@ -211,9 +210,9 @@ export default function AdvertiserReport({ logs, advertisers = [], conversionEve
                 ["의심 클릭률", percent(summary.suspiciousRate)],
                 ["차단 클릭률", percent(summary.blockedRate)],
                 ["평균 위험도", `${summary.avgRisk}점`],
-                ["평균 체류시간", `${number(summary.avgStay)}s`],
+                ["평균 체류시간", summary.avgStay ? `${number(summary.avgStay)}초` : "-"],
                 ["전환 이벤트 수", number(summary.conversionCount)],
-                ["예상 절감 광고비", currency.format(summary.saving)],
+                ["예상 절감 광고비", currency(summary.saving)],
                 ["활성 차단 IP 수", number(summary.activeBlockCount)]
               ].map(([label, value]) => (
                 <div key={label} className="rounded-md border border-line bg-panelSoft p-4">
@@ -229,13 +228,13 @@ export default function AdvertiserReport({ logs, advertisers = [], conversionEve
               <Chart title="유입경로별 클릭" data={referrers} barKey="total" color={chartColors.total} />
               <Chart title="의심 사유 TOP 5" data={reasons} barKey="total" color={chartColors.suspicious} />
               <Chart title="전환 이벤트 추이" data={conversionTrend(reportConversions)} barKey="total" color={chartColors.normal} />
-              <Chart title="page_url TOP 5" data={pages} barKey="total" color={chartColors.total} />
+              <Chart title="방문 페이지 TOP 5" data={pages} barKey="total" color={chartColors.total} />
             </div>
 
             <div className="grid gap-5 xl:grid-cols-3">
               <List title="반복 클릭 TOP IP" rows={repeatedIps.map((item) => ({ name: item.name, value: `${item.recentCount}회 / 로그 ${item.total}건` }))} />
-              <List title="UTM source" rows={utmSources.map((item) => ({ name: item.name, value: `${item.total}건` }))} />
-              <List title="UTM medium / campaign" rows={[...utmMediums, ...utmCampaigns].slice(0, 5).map((item) => ({ name: item.name, value: `${item.total}건` }))} />
+              <List title="캠페인 출처" rows={utmSources.map((item) => ({ name: item.name, value: `${item.total}건` }))} />
+              <List title="캠페인 매체/캠페인명" rows={[...utmMediums, ...utmCampaigns].slice(0, 5).map((item) => ({ name: item.name, value: `${item.total}건` }))} />
             </div>
 
             <div className="grid gap-5 xl:grid-cols-2">

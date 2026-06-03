@@ -13,8 +13,8 @@ export default function PolicyPage() {
             ["반복 클릭", "10분 내 3회 의심, 5회 차단"],
             ["체류시간", "3초 이하 위험도 가중"],
             ["페이지 이동", "0회이면 위험도 가중"],
-            ["IP 저장", "원문 저장 금지, ip_hash/ip_masked 사용"],
-            ["차단 해제", "삭제가 아닌 soft release 처리"],
+            ["IP 저장", "원문 저장 금지, 일부를 가린 IP만 표시"],
+            ["차단 해제", "삭제하지 않고 해제 이력으로 보관"],
             ["로그 보관", "기본 90일 정책"]
           ].map(([label, value]) => (
             <div key={label} className="rounded-md border border-line bg-panelSoft p-4">

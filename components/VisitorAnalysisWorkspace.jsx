@@ -46,8 +46,8 @@ export default function VisitorAnalysisWorkspace({ mode = "realtime" }) {
 
   const title = mode === "pages" ? "페이지별 유입" : mode === "logs" ? "방문자 로그" : "실시간 방문자";
   const description = mode === "pages"
-    ? "pm_click_logs의 page_url, referrer, UTM을 기준으로 유입 페이지를 집계합니다."
-    : "방문자와 세션 관점에서 수집 로그를 확인합니다. 화면에는 ip_hash를 노출하지 않고 ip_masked만 표시합니다.";
+    ? "방문자가 어떤 페이지로 들어왔는지와 유입 경로를 함께 집계합니다."
+    : "방문자와 세션 관점에서 유입 기록을 확인합니다. IP는 일부를 가린 형태로만 표시합니다.";
 
   return (
     <AppShell title={title} description={description}>
@@ -57,7 +57,7 @@ export default function VisitorAnalysisWorkspace({ mode = "realtime" }) {
         <Metric label="페이지뷰" value={stats.pageviews} />
         <Metric label="광고 클릭수" value={stats.adClicks} />
         <Metric label="3회 이상 클릭 IP" value={stats.repeated} />
-        <Metric label="평균 체류시간" value={`${number(stats.avgStay)}s`} />
+        <Metric label="평균 체류시간" value={stats.avgStay ? `${number(stats.avgStay)}초` : "-"} />
         <Metric label="PC/Mobile" value={`${stats.pc}/${stats.mobile}`} />
       </div>
       {mode === "pages" ? <PageTable rows={pageRows} /> : <VisitorTable logs={filteredLogs} />}
@@ -84,7 +84,7 @@ function VisitorTable({ logs }) {
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead className="bg-panelSoft text-xs uppercase text-slate-500">
             <tr>
-              {["시간", "visitor/session", "ip_masked", "page_url", "referrer", "UTM", "체류시간", "상태", "위험도"].map((head) => (
+              {["시간", "방문자/세션", "IP", "방문 페이지", "유입 경로", "캠페인 정보", "체류시간", "상태", "위험도"].map((head) => (
                 <th key={head} className="px-4 py-3 font-semibold">{head}</th>
               ))}
             </tr>
@@ -98,7 +98,7 @@ function VisitorTable({ logs }) {
                 <td className="max-w-[280px] truncate px-4 py-3 text-slate-300">{log.landingPage || log.pageUrl}</td>
                 <td className="max-w-[220px] truncate px-4 py-3 text-slate-400">{log.referrer || "-"}</td>
                 <td className="max-w-[220px] truncate px-4 py-3 text-slate-400">{log.utm || log.utmSource || "-"}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-300">{log.dwellSeconds || log.stayTime || 0}s</td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-300">{Number(log.dwellSeconds || log.stayTime || 0) > 0 ? `${number(log.dwellSeconds || log.stayTime)}초` : "-"}</td>
                 <td className="whitespace-nowrap px-4 py-3"><StatusBadge status={log.status} /></td>
                 <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-100">{log.riskScore}</td>
               </tr>
@@ -121,7 +121,7 @@ function PageTable({ rows }) {
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-panelSoft text-xs uppercase text-slate-500">
             <tr>
-              {["page_url", "페이지뷰", "의심", "차단"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
+              {["방문 페이지", "페이지뷰", "의심", "차단"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-line">

@@ -1,8 +1,7 @@
 import { Activity, Ban, CheckCircle2, CircleDollarSign, ShieldAlert, Siren } from "lucide-react";
 import clsx from "clsx";
 import { Card } from "@/components/ui";
-import { currency } from "@/lib/clickData";
-import { number, percent } from "@/lib/format";
+import { currency, number, percent } from "@/lib/format";
 
 function KpiCard({ label, value, caption, icon: Icon, tone }) {
   const toneClass = {
@@ -36,7 +35,7 @@ export default function KpiCards({ summary }) {
       <KpiCard label="의심 클릭수" value={number(summary.suspicious)} caption="검토 필요" icon={Siren} tone="warn" />
       <KpiCard label="차단 클릭수" value={number(summary.blocked)} caption="자동/수동 차단" icon={Ban} tone="danger" />
       <KpiCard label="의심 클릭률" value={percent(summary.suspiciousRate)} caption="의심+차단 비중" icon={ShieldAlert} tone="warn" />
-      <KpiCard label="예상 절감 광고비" value={currency.format(summary.savedCost)} caption="차단 CPC 합산" icon={CircleDollarSign} tone="brand" />
+      <KpiCard label="예상 절감 광고비" value={currency(summary.savedCost)} caption="차단 클릭 기준" icon={CircleDollarSign} tone="brand" />
     </div>
   );
 }

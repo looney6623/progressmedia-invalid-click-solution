@@ -4,19 +4,46 @@ import { useMemo } from "react";
 import AppShell from "@/components/AppShell";
 import FilterBar from "@/components/FilterBar";
 import { Card } from "@/components/ui";
-import { currency } from "@/lib/clickData";
-import { number } from "@/lib/format";
+import { currency, number } from "@/lib/format";
 import { useAppState } from "@/components/AppStateProvider";
 
+const modeCopy = {
+  events: {
+    title: "전환 이벤트",
+    description: "광고 클릭 이후 문의, 구매, 예약처럼 성과로 이어진 행동을 확인합니다.",
+    summaryTitle: "전환 유입 요약",
+    summaryDescription: "전환 데이터가 연결되면 유입 경로별 성과를 비교할 수 있습니다.",
+    empty: "아직 전환으로 확인된 기록이 없습니다."
+  },
+  logs: {
+    title: "전환 로그",
+    description: "수집된 클릭과 전환 기록을 함께 보며 어떤 유입이 성과로 이어졌는지 확인합니다.",
+    summaryTitle: "유입 경로별 기록",
+    summaryDescription: "현재는 클릭 기록 기준으로 유입 경로별 위험도를 집계합니다.",
+    empty: "표시할 전환 관련 기록이 없습니다."
+  },
+  savings: {
+    title: "광고비 절감 추정",
+    description: "차단된 클릭에 책정된 클릭 비용을 기준으로 아낀 광고비를 추정합니다.",
+    summaryTitle: "절감 추정 근거",
+    summaryDescription: "차단 또는 의심으로 분류된 클릭의 유입 경로와 평균 위험도를 비교합니다.",
+    empty: "절감액을 계산할 차단 기록이 없습니다."
+  }
+};
+
 export default function ConversionWorkspace({ mode = "events" }) {
-  const { user, myAdvertisers, allAdvertisers, filters, setFilters, filteredLogs, summary } = useAppState();
+  const { user, myAdvertisers, allAdvertisers, filters, setFilters, filteredLogs, conversionEvents, summary } = useAppState();
   const advertisers = user?.role === "admin" ? allAdvertisers : myAdvertisers;
-  const title = mode === "logs" ? "전환 로그" : mode === "savings" ? "광고비 절감 추정" : "전환 이벤트";
+  const copy = modeCopy[mode] || modeCopy.events;
+  const title = copy.title;
   const blockedOrSuspicious = filteredLogs.filter((log) => log.status !== "정상");
+  const savingAmount = summary.savedCost || 0;
+  const conversionCount = conversionEvents.length;
 
   const sources = useMemo(() => {
     const map = new Map();
     filteredLogs.forEach((log) => {
+      if (mode === "savings" && log.status !== "차단") return;
       const key = log.utm || log.referrer || log.media || "직접/기타";
       const row = map.get(key) || { source: key, count: 0, risk: 0 };
       row.count += 1;
@@ -24,27 +51,27 @@ export default function ConversionWorkspace({ mode = "events" }) {
       map.set(key, row);
     });
     return Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, 20);
-  }, [filteredLogs]);
+  }, [filteredLogs, mode]);
 
   return (
-    <AppShell title={title} description="pm_conversion_events와 pm_click_logs를 연결해 전환, 체류, 광고비 절감 효과를 확인하는 메뉴입니다.">
+    <AppShell title={title} description={copy.description}>
       <FilterBar filters={filters} setFilters={setFilters} advertiserOptions={advertisers} />
       <div className="grid gap-4 md:grid-cols-4">
-        <Metric label="수집 로그" value={filteredLogs.length} />
-        <Metric label="위험 로그" value={blockedOrSuspicious.length} />
+        <Metric label={mode === "events" ? "전환 수" : "전체 클릭"} value={mode === "events" ? conversionCount : filteredLogs.length} />
+        <Metric label="검토 대상" value={blockedOrSuspicious.length} />
         <Metric label="차단 클릭" value={summary.blocked} />
-        <Metric label="예상 절감 광고비" value={currency.format(summary.saving)} />
+        <Metric label="예상 절감 광고비" value={currency(savingAmount)} />
       </div>
       <Card>
         <div className="border-b border-line px-5 py-4">
-          <h2 className="text-sm font-bold text-white">{title} 요약</h2>
-          <p className="mt-1 text-xs text-slate-500">전환 이벤트 원장 조회는 `pm_conversion_events` 기반 API 연결 후 이 영역에 확장됩니다.</p>
+          <h2 className="text-sm font-bold text-white">{copy.summaryTitle}</h2>
+          <p className="mt-1 text-xs text-slate-500">{copy.summaryDescription}</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="bg-panelSoft text-xs uppercase text-slate-500">
               <tr>
-                {["유입/전환 기준", "로그 수", "평균 위험도"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
+                {["유입 경로", "클릭 수", "평균 위험도"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -57,7 +84,7 @@ export default function ConversionWorkspace({ mode = "events" }) {
               ))}
             </tbody>
           </table>
-          {sources.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-500">전환 분석에 사용할 로그가 없습니다.</div>}
+          {sources.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-500">{copy.empty}</div>}
         </div>
       </Card>
     </AppShell>

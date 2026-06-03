@@ -11,7 +11,7 @@ import { useAppState } from "@/components/AppStateProvider";
 export default function LogAnalysisWorkspace({ mode = "all" }) {
   const { user, myAdvertisers, allAdvertisers, filters, setFilters, filteredLogs, refreshAccess } = useAppState();
   const advertisers = user?.role === "admin" ? allAdvertisers : myAdvertisers;
-  const title = mode === "referrers" ? "Referrer URL" : mode === "utm" ? "UTM 분석" : mode === "keywords" ? "검색어/키워드" : "전체 로그";
+  const title = mode === "referrers" ? "유입 경로" : mode === "utm" ? "캠페인 분석" : mode === "keywords" ? "검색어/키워드" : "전체 로그";
 
   const rows = useMemo(() => {
     const field = mode === "referrers" ? "referrer" : mode === "utm" ? "utm" : "keyword";
@@ -29,7 +29,7 @@ export default function LogAnalysisWorkspace({ mode = "all" }) {
   }, [filteredLogs, mode]);
 
   return (
-    <AppShell title={title} description="pm_click_logs를 기준으로 전체 로그, referrer, UTM, 검색어 흐름을 분석합니다.">
+    <AppShell title={title} description="수집된 클릭 기록을 기준으로 유입 경로, 캠페인, 검색어 흐름을 분석합니다.">
       <FilterBar filters={filters} setFilters={setFilters} advertiserOptions={advertisers} />
       {mode === "all" ? <ClickLogTable logs={filteredLogs} onRefresh={() => refreshAccess()} /> : <AggregateTable title={title} rows={rows} />}
     </AppShell>

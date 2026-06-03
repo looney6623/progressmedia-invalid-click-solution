@@ -8,10 +8,10 @@ import { number } from "@/lib/format";
 import { useAppState } from "@/components/AppStateProvider";
 
 const pageMeta = {
-  "ad-click-ip": ["광고 클릭 IP", "UTM, referrer, 키워드가 있는 광고 유입 로그를 IP 단위로 확인합니다."],
-  "suspicious-ip": ["의심 클릭 IP", "click_status가 suspicious인 로그를 중심으로 의심 사유를 확인합니다."],
-  "blocked-ip": ["차단 판정 로그", "click_status가 blocked인 판정 로그를 확인합니다. 실제 해제 대상은 차단 관리의 활성 차단 IP입니다."],
-  "repeated-ip": ["반복 클릭 IP", "recent_count와 ip_masked 기준으로 반복 클릭 패턴을 정렬합니다."],
+  "ad-click-ip": ["광고 클릭 IP", "광고를 통해 들어온 클릭을 IP 단위로 확인합니다."],
+  "suspicious-ip": ["의심 클릭 IP", "의심으로 분류된 클릭과 판정 사유를 확인합니다."],
+  "blocked-ip": ["차단 판정 로그", "차단으로 분류된 클릭을 확인합니다. 실제 차단 해제는 차단 관리 화면에서 처리합니다."],
+  "repeated-ip": ["반복 클릭 IP", "짧은 시간 안에 반복된 클릭 패턴을 정렬합니다."],
   "exposure-limited-ip": ["노출제한 IP", "매체 연동 전 단계의 차단/노출제한 후보를 관리합니다."]
 };
 
@@ -55,7 +55,7 @@ export default function InvalidClickWorkspace({ mode = "ad-click-ip" }) {
       {mode === "repeated-ip" ? <RepeatedTable rows={repeatedSummary} /> : <InvalidTable rows={rows} mode={mode} />}
       {mode === "exposure-limited-ip" && (
         <Card className="border-brand/20 bg-brand/5 p-5 text-sm leading-6 text-brand">
-          현재는 실제 네이버/구글 광고 플랫폼의 노출 제한 API와 연결하지 않았습니다. 이 화면은 `pm_click_logs`와 `pm_blocked_ips` 기반의 노출제한 후보이며, 향후 매체 API 연동 시 제외 IP 동기화 화면으로 확장합니다.
+          현재는 네이버/구글 광고 계정과 자동 연동하지 않습니다. 이 화면은 노출 제한 후보를 검토하는 용도이며, 향후 매체 연동 시 제외 IP 동기화 화면으로 확장할 수 있습니다.
         </Card>
       )}
     </AppShell>
@@ -76,13 +76,13 @@ function InvalidTable({ rows }) {
     <Card>
       <div className="border-b border-line px-5 py-4">
         <h2 className="text-sm font-bold text-white">IP 분석 로그</h2>
-        <p className="mt-1 text-xs text-slate-500">ip_hash는 화면에 노출하지 않고 ip_masked 기준으로 표시합니다.</p>
+        <p className="mt-1 text-xs text-slate-500">IP 원문은 표시하지 않고 일부를 가린 값만 보여줍니다.</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead className="bg-panelSoft text-xs uppercase text-slate-500">
             <tr>
-              {["시간", "광고주", "client_id", "ip_masked", "referrer/UTM", "키워드", "최근 클릭", "위험도", "상태", "판정 사유"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
+              {["시간", "광고주", "고객 코드", "IP", "유입 경로", "키워드", "최근 클릭", "위험도", "상태", "판정 사유"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -118,7 +118,7 @@ function RepeatedTable({ rows }) {
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-panelSoft text-xs uppercase text-slate-500">
             <tr>
-              {["ip_masked", "로그 수", "최근 10분 클릭", "의심", "차단", "최고 위험도"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
+              {["IP", "로그 수", "최근 10분 클릭", "의심", "차단", "최고 위험도"].map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
