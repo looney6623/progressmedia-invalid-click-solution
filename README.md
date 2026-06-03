@@ -224,6 +224,40 @@ alter table public.pm_profiles add constraint pm_profiles_role_check check (role
 notify pgrst, 'reload schema';
 ```
 
+## 메뉴/라우트 중복 정리 결과
+
+상용화 UX 기준으로 사이드바 메뉴와 라우트 화면을 전수조사하고, 같은 컴포넌트가 제목만 바꿔 반복되던 화면을 목적별로 분리했습니다.
+
+| 메뉴명 | 라우트 | 사용 컴포넌트 | 현재 문제 | 처리 방향 |
+| --- | --- | --- | --- | --- |
+| 실시간 방문자 | `/visitors/realtime` | `VisitorAnalysisWorkspace(mode="realtime")` | 방문자 로그와 같은 카드/테이블 구조 | 최근 유입 15건, 현재 페이지, 체류 신호 중심으로 분리 |
+| 방문자 로그 | `/visitors/logs` | `VisitorAnalysisWorkspace(mode="logs")` | 실시간 방문자와 동일하게 보임 | 방문자/세션별 클릭 수, 페이지 수, 최고 위험도 중심으로 분리 |
+| 페이지별 유입 | `/visitors/pages` | `VisitorAnalysisWorkspace(mode="pages")` | 방문자 로그 테이블과 유사 | 방문 페이지별 페이지뷰, 방문자, 주요 유입 경로, 평균 체류 집계로 분리 |
+| 광고 클릭 IP | `/invalid-clicks/ad-click-ip` | `InvalidClickWorkspace(mode="ad-click-ip")` | 의심 클릭 IP와 동일 로그처럼 보임 | 전체 상태 포함 IP별 클릭 수, 최근 클릭, 유입 경로 중심으로 분리 |
+| 의심 클릭 IP | `/invalid-clicks/suspicious-ip` | `InvalidClickWorkspace(mode="suspicious-ip")` | 광고 클릭 IP와 필터 차이만 있음 | 의심 사유, 반복 횟수, 체류시간, 페이지 이동 여부 중심으로 분리 |
+| 반복 클릭 IP | `/invalid-clicks/repeated-ip` | `InvalidClickWorkspace(mode="repeated-ip")` | 의심/광고 클릭과 같은 표 | 반복 조건에 걸린 IP의 최근 10분 클릭과 반복 패턴 중심으로 분리 |
+| 노출제한 IP | `/invalid-clicks/exposure-limited-ip` | `InvalidClickWorkspace(mode="exposure-limited-ip")` | 실제 매체 연동 데이터 없음 | 준비중 안내 화면으로 변경, 기존 라우트는 유지 |
+| 차단 판정 로그 | `/invalid-clicks/blocked-ip` | `InvalidClickWorkspace(mode="blocked-ip")` | 실제 활성 차단 IP와 혼동 가능 | 차단 판정 기록만 표시하고 차단 해제 버튼은 제공하지 않음 |
+| 자동 차단 규칙 | `/blocks/rules` | `BlockWorkspace(mode="rules")` | 차단 관리 전체 탭이 노출됨 | 규칙/판정 후보 탭만 표시, 긴급 중지와 규칙 설정 중심 |
+| 수동 차단 IP | `/blocks/manual` | `BlockWorkspace(mode="manual")` | 규칙/이력과 같은 화면 묶음 | 활성 차단 IP와 직접 차단 폼만 표시 |
+| 차단 해제 이력 | `/blocks/history` | `BlockWorkspace(mode="history")` | 수동 차단 화면과 탭만 다름 | 해제 이력만 표시 |
+| 전환 요약 | `/conversions/events` | `ConversionWorkspace(mode="events")` | 전환 로그/절감 추정과 같은 표 | 전환 유입 경로, 전환 수, 전환 가치 요약으로 분리 |
+| 전환 상세 로그 | `/conversions/logs` | `ConversionWorkspace(mode="logs")` | 전환 이벤트와 동일 집계 | 개별 전환 시간, 광고주, 방문 페이지, 유입 경로 중심으로 분리 |
+| 광고비 절감 추정 | `/conversions/savings` | `ConversionWorkspace(mode="savings")` | 같은 유입 표 반복, 값 없을 때 NaN 위험 | 차단 클릭 수, 평균 클릭 비용, 예상 절감액 산식과 근거 로그로 분리 |
+| CSV 내보내기 | `/reports/export` | 전용 export page | 광고주 리포트와 동일 화면 | 다운로드 목적 안내와 CSV 버튼 중심 화면으로 분리 |
+| 인쇄용 리포트 | `/reports/print` | 전용 print page + `AdvertiserReport` | 광고주 리포트와 동일 화면 | 인쇄/PDF 저장 목적과 인쇄 버튼 중심 화면으로 분리 |
+
+준비중 처리:
+
+- `노출제한 IP`는 네이버/구글 광고 계정 제외 IP 동기화 데이터가 아직 없으므로 준비중 안내 화면으로 유지합니다.
+
+추가 DB/API 개선안:
+
+- 방문자 실시간성 강화를 위해 최근 접속 상태 또는 마지막 heartbeat 시간을 저장하는 컬럼이 필요합니다.
+- 노출제한 IP를 실제 메뉴로 운영하려면 매체별 제외 IP 동기화 상태, 동기화 결과, 실패 사유 테이블이 필요합니다.
+- 전환 요약 품질을 높이려면 전환 이벤트와 클릭 로그를 안정적으로 연결하는 `click_id` 또는 공통 attribution key가 필요합니다.
+- 절감액 정확도를 높이려면 광고주/캠페인/키워드별 실제 CPC를 저장하거나 외부 광고 API에서 비용을 동기화해야 합니다.
+
 API가 `DB_ROLE_CONSTRAINT_MISMATCH`를 반환하면 위 SQL을 Supabase SQL Editor에 반영한 뒤 광고주 생성을 다시 시도합니다.
 
 ## API Route

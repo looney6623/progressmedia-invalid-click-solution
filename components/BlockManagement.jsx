@@ -32,7 +32,8 @@ export default function BlockManagement({
   onUpdateAdvertiserBlocking,
   onUpdateLogStatus,
   onRefresh,
-  defaultTab = "active"
+  defaultTab = "active",
+  allowedTabs
 }) {
   const initialTab = defaultTab === "manual" ? "active" : defaultTab;
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -41,6 +42,8 @@ export default function BlockManagement({
   const [savingKey, setSavingKey] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const visibleTabs = tabs.filter((tab) => !allowedTabs || allowedTabs.includes(tab.id));
+  const selectedTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : visibleTabs[0]?.id || activeTab;
 
   const candidateLogs = useMemo(() => {
     return [...blockedLogs, ...suspiciousLogs]
@@ -154,12 +157,12 @@ export default function BlockManagement({
 
       <Card className="p-2 no-print">
         <div className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${activeTab === tab.id ? "bg-brand text-ink" : "text-slate-400 hover:bg-panelSoft hover:text-white"}`}
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${selectedTab === tab.id ? "bg-brand text-ink" : "text-slate-400 hover:bg-panelSoft hover:text-white"}`}
             >
               {tab.label}
             </button>
@@ -173,7 +176,7 @@ export default function BlockManagement({
         </div>
       </Card>
 
-      {activeTab === "rules" && (
+      {selectedTab === "rules" && (
         <Card>
           <SectionTitle icon={SlidersHorizontal} title="자동 판정 규칙" />
           <SectionDescription>
@@ -255,7 +258,7 @@ export default function BlockManagement({
         </Card>
       )}
 
-      {activeTab === "candidates" && (
+      {selectedTab === "candidates" && (
         <Card>
           <SectionTitle icon={ShieldAlert} title="차단 판정 로그" right={<span className="text-xs text-slate-500">차단 판정 {number(blockedLogs.length)} · 의심 {number(suspiciousLogs.length)}</span>} />
           <SectionDescription>
@@ -299,7 +302,7 @@ export default function BlockManagement({
         </Card>
       )}
 
-      {activeTab === "active" && (
+      {selectedTab === "active" && (
         <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
           <Card>
             <SectionTitle icon={Ban} title="활성 차단 IP" right={<span className="text-xs text-slate-500">{number(manualBlocks.length)}개</span>} />
@@ -334,7 +337,7 @@ export default function BlockManagement({
         </div>
       )}
 
-      {activeTab === "history" && (
+      {selectedTab === "history" && (
         <Card>
           <SectionTitle icon={CheckCircle2} title="차단 해제 이력" right={<span className="text-xs text-slate-500">{number(releasedBlocks.length)}개</span>} />
           <BlockTable blocks={releasedBlocks} showHash={showHash} released />
