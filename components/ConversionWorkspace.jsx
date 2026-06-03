@@ -5,6 +5,7 @@ import AppShell from "@/components/AppShell";
 import FilterBar from "@/components/FilterBar";
 import { Card } from "@/components/ui";
 import { currency, number, percent } from "@/lib/format";
+import { rawTrafficDetail, trafficSourceLabel } from "@/lib/trafficSource";
 import { useAppState } from "@/components/AppStateProvider";
 
 const modeCopy = {
@@ -21,10 +22,6 @@ const modeCopy = {
     description: "차단 클릭 수, 평균 클릭 비용, 예상 절감액과 계산 근거를 확인합니다."
   }
 };
-
-function sourceOf(item) {
-  return item.utmSource || item.utm || item.referrer || item.media || "직접/기타";
-}
 
 function eventLabel(event) {
   return event.eventName || event.eventType || "전환";
@@ -53,7 +50,7 @@ export default function ConversionWorkspace({ mode = "events" }) {
   const sourceRows = useMemo(() => {
     const map = new Map();
     conversionEvents.forEach((event) => {
-      const key = sourceOf(event);
+      const key = trafficSourceLabel(event);
       const row = map.get(key) || { source: key, conversions: 0, value: 0, advertisers: new Set() };
       row.conversions += 1;
       row.value += Number(event.value || 0);
@@ -118,7 +115,7 @@ function Metric({ label, value }) {
 
 function ConversionSourceTable({ rows }) {
   return (
-    <DataCard title="전환 유입 요약" description="전환이 발생한 유입 경로와 성과 가치를 집계합니다.">
+    <DataCard title="전환 유입 요약" description="전환이 발생한 경로를 네이버, 메타/인스타그램, 구글, 직접 유입, 기타로 묶어 집계합니다.">
       <Table headers={["유입 경로", "전환 수", "광고주 수", "전환 가치"]}>
         {rows.map((row) => (
           <tr key={row.source}>
@@ -137,7 +134,7 @@ function ConversionSourceTable({ rows }) {
 function ConversionLogTable({ rows }) {
   return (
     <DataCard title="개별 전환 로그" description="전환이 들어온 시간, 광고주, 방문 페이지, 유입 경로를 개별 기록으로 확인합니다.">
-      <Table headers={["시간", "광고주", "전환명", "전환 가치", "방문 페이지", "유입 경로", "IP"]}>
+      <Table headers={["시간", "광고주", "전환명", "전환 가치", "방문 페이지", "유입 경로", "보조 정보", "IP"]}>
         {rows.map((event) => (
           <tr key={event.id}>
             <Cell>{event.dateTime || "-"}</Cell>
@@ -145,7 +142,8 @@ function ConversionLogTable({ rows }) {
             <Cell>{eventLabel(event)}</Cell>
             <Cell>{currency(event.value)}</Cell>
             <Cell truncate>{event.pageUrl || "-"}</Cell>
-            <Cell truncate>{sourceOf(event)}</Cell>
+            <Cell>{trafficSourceLabel(event)}</Cell>
+            <Cell truncate>{rawTrafficDetail(event)}</Cell>
             <Mono>{event.ipMasked || "-"}</Mono>
           </tr>
         ))}
@@ -187,7 +185,7 @@ function BlockedCostTable({ rows }) {
             <Cell>{log.dateTime || log.time}</Cell>
             <Cell>{log.advertiser}</Cell>
             <Mono>{log.ipMasked || log.ip}</Mono>
-            <Cell truncate>{sourceOf(log)}</Cell>
+            <Cell>{trafficSourceLabel(log)}</Cell>
             <Cell>{currency(log.cpc)}</Cell>
             <Cell truncate>{log.reason || "-"}</Cell>
           </tr>
@@ -212,7 +210,7 @@ function DataCard({ title, description, children }) {
 
 function Table({ headers, children }) {
   return (
-    <table className="w-full min-w-[900px] text-left text-sm">
+    <table className="w-full min-w-[960px] text-left text-sm">
       <thead className="bg-panelSoft text-xs uppercase text-slate-500">
         <tr>{headers.map((head) => <th key={head} className="px-4 py-3 font-semibold">{head}</th>)}</tr>
       </thead>

@@ -5,6 +5,7 @@ import AppShell from "@/components/AppShell";
 import FilterBar from "@/components/FilterBar";
 import { Card, StatusBadge } from "@/components/ui";
 import { number } from "@/lib/format";
+import { trafficSourceLabel } from "@/lib/trafficSource";
 import { useAppState } from "@/components/AppStateProvider";
 
 const pageMeta = {
@@ -16,7 +17,7 @@ const pageMeta = {
 };
 
 function sourceOf(log) {
-  return log.referrer || log.utm || log.utmSource || log.media || "직접 유입";
+  return trafficSourceLabel(log);
 }
 
 function stayLabel(log) {
