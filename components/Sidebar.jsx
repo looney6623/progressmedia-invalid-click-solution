@@ -96,7 +96,7 @@ const menuGroups = [
     title: "설정",
     items: [
       { href: "/settings/account", label: "내 계정", icon: UserCircle, roles: ["admin", "marketer", "advertiser"] },
-      { href: "/settings/tracking", label: "광고 보호 URL", icon: Link2, roles: ["admin", "marketer"] },
+      { href: "/settings/tracking", label: "추적 파라미터", icon: Link2, roles: ["admin", "marketer"] },
       { href: "/settings/policy", label: "운영 정책", icon: Settings, roles: ["admin", "marketer"] }
     ]
   }

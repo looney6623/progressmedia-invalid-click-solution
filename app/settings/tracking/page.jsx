@@ -1,7 +1,7 @@
 "use client";
 
-import TrackingLinkWorkspace from "@/components/TrackingLinkWorkspace";
+import TrackingParameterWorkspace from "@/components/TrackingParameterWorkspace";
 
 export default function TrackingSettingsPage() {
-  return <TrackingLinkWorkspace />;
+  return <TrackingParameterWorkspace />;
 }

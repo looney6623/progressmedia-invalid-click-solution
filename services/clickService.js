@@ -18,7 +18,6 @@ let advertiserSequence = 6;
 let advertiserUserSequence = 3;
 let assignmentSequence = 5;
 let marketerSequence = 3;
-let trackingLinkSequence = 1;
 
 export let mockAdvertisers = [
   { id: "adv_001", name: "샤브20", clientId: "pm-shabu20", projectKey: "pk_shabu20_demo", siteUrl: "https://shabu20.example.com", status: "active", createdBy: "user_marketer_1" },
@@ -47,8 +46,6 @@ let mockAdvertiserUsers = [
   { id: "adu_001", userId: "user_client_shabu20", advertiserId: "adv_001", permission: "manage", createdBy: "user_marketer_1", isActive: true, inviteLink: "https://app.progressmedia.example/invite/adu_001", temporaryPassword: "Temp!2026" },
   { id: "adu_002", userId: "user_client_3pay", advertiserId: "adv_002", permission: "view", createdBy: "user_marketer_1", isActive: true, inviteLink: "https://app.progressmedia.example/invite/adu_002", temporaryPassword: "Temp!2026" }
 ];
-
-let mockTrackingLinks = [];
 
 function browserSessionStorage() {
   if (typeof window === "undefined") return null;
@@ -761,70 +758,6 @@ export async function removeBlock(blockId) {
   const mode = ensureServiceMode();
   if (mode === "supabase") return apiRequest("/api/blocked-ips", { method: "PATCH", payload: { id: blockId } });
   return { ok: true, releasedBlockId: blockId, releasedAt: "2026-05-27 14:30" };
-}
-
-function mapTrackingLinkFromApi(item) {
-  return {
-    id: item.id,
-    advertiserId: item.advertiserId || item.advertiser_id,
-    advertiserName: item.advertiserName || item.advertiser?.name || "",
-    channel: item.channel,
-    name: item.name,
-    destinationUrl: item.destinationUrl || item.destination_url,
-    allowedDomain: item.allowedDomain || item.allowed_domain,
-    isActive: item.isActive ?? item.is_active ?? true,
-    createdAt: item.createdAt || item.created_at,
-    updatedAt: item.updatedAt || item.updated_at
-  };
-}
-
-export async function fetchTrackingLinks() {
-  const mode = ensureServiceMode();
-  if (mode === "supabase") {
-    const result = await apiRequest("/api/tracking-links");
-    if (!result.ok) return { items: [], error: result.error || result.message };
-    return { items: (result.items || []).map(mapTrackingLinkFromApi) };
-  }
-  if (mode === "mock") return { items: mockTrackingLinks };
-  return { items: [], error: getSupabaseConfigError() };
-}
-
-export async function createTrackingLink(payload) {
-  const mode = ensureServiceMode();
-  if (mode === "supabase") {
-    const result = await apiPost("/api/tracking-links", {
-      advertiser_id: payload.advertiserId,
-      channel: payload.channel,
-      name: payload.name,
-      destination_url: payload.destinationUrl,
-      allowed_domain: payload.allowedDomain,
-      is_active: true
-    });
-    if (!result.ok) return result;
-    return { ok: true, link: mapTrackingLinkFromApi(result.link) };
-  }
-  if (mode === "unavailable") return serviceUnavailable();
-  const advertiser = mockAdvertisers.find((item) => item.id === payload.advertiserId);
-  let url;
-  try {
-    url = new URL(payload.destinationUrl);
-    if (!["http:", "https:"].includes(url.protocol)) throw new Error("invalid protocol");
-  } catch {
-    return { ok: false, error: "http 또는 https로 시작하는 정상 랜딩 URL을 입력해 주세요." };
-  }
-  const link = {
-    id: `tl_mock_${String(trackingLinkSequence++).padStart(3, "0")}`,
-    advertiserId: payload.advertiserId,
-    advertiserName: advertiser?.name || "",
-    channel: payload.channel,
-    name: payload.name || "네이버 광고 보호 URL",
-    destinationUrl: url.toString(),
-    allowedDomain: payload.allowedDomain || url.hostname,
-    isActive: true,
-    createdAt: new Date().toISOString()
-  };
-  mockTrackingLinks = [link, ...mockTrackingLinks];
-  return { ok: true, link };
 }
 
 export async function updateClickLogStatus(logId, clickStatus, reason) {

@@ -73,6 +73,21 @@ export async function POST(request) {
 
   const stayTime = readNumber(body, "stay_time", "stayTime", null);
   const pageCount = readNumber(body, "page_count", "pageCount", 1);
+  const pmChannel = body.pm_channel || "";
+  const pmAccount = body.pm_account || "";
+  const nCampaign = body.n_campaign || "";
+  const nKeyword = body.n_keyword || "";
+  const nQuery = body.n_query || "";
+  const nMedia = body.n_media || "";
+  const nAdGroup = body.n_ad_group || body.n_group || "";
+  const nAd = body.n_ad || "";
+  const nKeywordId = body.n_keyword_id || "";
+  const nMallPid = body.n_mall_pid || "";
+  const mappedUtmSource = pmChannel || body.utm_source || "";
+  const mappedUtmMedium = nMedia || pmAccount || body.utm_medium || "";
+  const mappedUtmCampaign = nCampaign || body.utm_campaign || "";
+  const mappedUtmTerm = nKeyword || nQuery || body.utm_term || "";
+  const mappedUtmContent = [nAdGroup, nAd, nKeywordId, nMallPid, body.utm_content || ""].filter(Boolean).join(" / ");
   const detection = await detectInvalidClick({
     supabase,
     advertiserId: advertiser.id,
@@ -80,7 +95,7 @@ export async function POST(request) {
     stayTime,
     pageCount,
     referrer: body.referrer || "",
-    utmSource: body.utm_source || "",
+    utmSource: mappedUtmSource,
     blockingEnabled: advertiser.blocking_enabled !== false
   });
   const createdAt = new Date().toISOString();
@@ -95,11 +110,11 @@ export async function POST(request) {
     user_agent: userAgent,
     page_url: pageUrl,
     referrer: body.referrer || "",
-    utm_source: body.utm_source || "",
-    utm_medium: body.utm_medium || "",
-    utm_campaign: body.utm_campaign || "",
-    utm_term: body.utm_term || "",
-    utm_content: body.utm_content || "",
+    utm_source: mappedUtmSource,
+    utm_medium: mappedUtmMedium,
+    utm_campaign: mappedUtmCampaign,
+    utm_term: mappedUtmTerm,
+    utm_content: mappedUtmContent,
     stay_time: stayTime,
     page_count: pageCount,
     click_status: detection.click_status,
