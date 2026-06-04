@@ -82,7 +82,7 @@ const menuGroups = [
       { href: "/advertisers/create", label: "광고주/사이트 등록", icon: Target, roles: ["admin", "marketer"] },
       { href: "/advertisers/accounts", label: "광고주 로그인 계정 발급", icon: UserCircle, roles: ["admin", "marketer"] },
       { href: "/advertisers/scripts", label: "설치 스크립트", icon: FileText, roles: ["admin", "marketer"] },
-      { href: "/advertisers/tracking", label: "추적 파라미터", icon: Link2, roles: ["admin", "marketer"] }
+      { href: "/advertisers/tracking", label: "네이버 경유 추적 URL", icon: Link2, roles: ["admin", "marketer"] }
     ]
   },
   {

@@ -224,6 +224,60 @@ alter table public.pm_profiles add constraint pm_profiles_role_check check (role
 notify pgrst, 'reload schema';
 ```
 
+## 네이버 경유 추적 URL 운영 기준
+
+네이버/GFA 연동은 네이버 광고관리자의 `추적 경유 사이트`에 등록할 URL을 생성하는 방식으로 운영합니다. 광고 클릭은 먼저 프로그레스미디어 서버의 `/api/r/{channel}` 라우트로 들어오고, 서버가 클릭 로그를 저장한 뒤 정상 또는 의심 클릭이면 `n_final_url`의 최종 랜딩 URL로 302 리다이렉트합니다. 활성 차단 IP 또는 자동 차단 판정 클릭은 최종 랜딩으로 보내지 않고 `/blocked-click`으로 이동합니다.
+
+운영 URL:
+
+```text
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app
+```
+
+지원 화면:
+
+- 메뉴명: `네이버 경유 추적 URL`
+- 화면: `/advertisers/tracking`
+- 메뉴 위치: 좌측 `광고주 관리` 섹션
+- 지원 채널: 파워링크, 쇼핑검색광고, GFA
+- 필수 매크로: `n_final_url={final_url}`
+- 광고주 사이트 도메인 검증: `n_final_url`의 도메인은 `pm_advertisers.site_url` 도메인과 같아야 합니다.
+
+파워링크 예시:
+
+```text
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_powerlink?pm_adv={advertiser_key}&pm_account={naver_account_id}&n_final_url={final_url}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_ad_extension={ad_extension}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_ad_group_type={ad_group_type}
+```
+
+쇼핑검색광고 예시:
+
+```text
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_shopping?pm_adv={advertiser_key}&pm_account={naver_account_id}&n_final_url={final_url}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_mall_id={mall_id}&n_mall_pid={mall_pid}&n_ad_group_type={ad_group_type}
+```
+
+GFA 예시:
+
+```text
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_gfa?pm_adv={advertiser_key}&pm_account={naver_account_id}&n_final_url={final_url}&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
+```
+
+저장 매핑:
+
+- `pm_adv`: 광고주 조회 키입니다. 서버는 `client_id`, `project_key`, 광고주 ID, 광고주 ID 앞부분 순서로 조회합니다.
+- `pm_account`: `utm_medium` 보조값으로 저장합니다.
+- `channel` 또는 `n_media`: `media`, `utm_source`, `utm_medium` 분석에 사용합니다.
+- `n_campaign`: `campaign`, `utm_campaign`에 저장합니다.
+- `n_keyword` 또는 `n_query`: `keyword`, `utm_term`에 저장합니다.
+- `n_ad_group`, `n_group`, `n_ad`, `n_keyword_id`, `n_mall_pid`: `utm_content`에 요약 저장합니다.
+
+보안 및 QA:
+
+- `n_final_url`은 `http` 또는 `https`만 허용합니다.
+- `javascript:`, `data:`, `file:` 프로토콜은 차단합니다.
+- IP 원문은 저장하지 않고 `ip_hash`, `ip_masked`만 저장합니다.
+- 활성 차단 IP는 `blocking_enabled=false` 상태에서도 최종 랜딩으로 보내지 않습니다.
+- 광고 등록 전 테스트 클릭으로 정상 랜딩과 `pm_click_logs` 저장 여부를 반드시 확인합니다.
+
 ## 메뉴/라우트 중복 정리 결과
 
 상용화 UX 기준으로 사이드바 메뉴와 라우트 화면을 전수조사하고, 같은 컴포넌트가 제목만 바꿔 반복되던 화면을 목적별로 분리했습니다.
@@ -241,81 +295,7 @@ notify pgrst, 'reload schema';
 | 자동 차단 규칙 | `/blocks/rules` | `BlockWorkspace(mode="rules")` | 차단 관리 전체 탭이 노출됨 | 규칙/판정 후보 탭만 표시, 긴급 중지와 규칙 설정 중심 |
 | 수동 차단 IP | `/blocks/manual` | `BlockWorkspace(mode="manual")` | 규칙/이력과 같은 화면 묶음 | 활성 차단 IP와 직접 차단 폼만 표시 |
 | 차단 해제 이력 | `/blocks/history` | `BlockWorkspace(mode="history")` | 수동 차단 화면과 탭만 다름 | 해제 이력만 표시 |
-| 전환 요약 | `/conversions/events` | `ConversionWorkspace(mode="events")` | 전환 로그/절감 추정과 같은 표 | 전환 유입 경로, 전환 수, 전환 가치 요약으로 분리 |
-| 전환 상세 로그 | `/conversions/logs` | `ConversionWorkspace(mode="logs")` | 전환 이벤트와 동일 집계 | 개별 전환 시간, 광고주, 방문 페이지, 유입 경로 중심으로 분리 |
-| 광고비 절감 추정 | `/conversions/savings` | `ConversionWorkspace(mode="savings")` | 같은 유입 표 반복, 값 없을 때 NaN 위험 | 차단 클릭 수, 평균 클릭 비용, 예상 절감액 산식과 근거 로그로 분리 |
-| CSV 내보내기 | `/reports/export` | 전용 export page | 광고주 리포트와 동일 화면 | 다운로드 목적 안내와 CSV 버튼 중심 화면으로 분리 |
-| 인쇄용 리포트 | `/reports/print` | 전용 print page + `AdvertiserReport` | 광고주 리포트와 동일 화면 | 인쇄/PDF 저장 목적과 인쇄 버튼 중심 화면으로 분리 |
 
-준비중 처리:
-
-- `노출제한 IP`는 네이버/구글 광고 계정 제외 IP 동기화 데이터가 아직 없으므로 준비중 안내 화면으로 유지합니다.
-
-추가 DB/API 개선안:
-
-- 방문자 실시간성 강화를 위해 최근 접속 상태 또는 마지막 heartbeat 시간을 저장하는 컬럼이 필요합니다.
-- 노출제한 IP를 실제 메뉴로 운영하려면 매체별 제외 IP 동기화 상태, 동기화 결과, 실패 사유 테이블이 필요합니다.
-- 전환 요약 품질을 높이려면 전환 이벤트와 클릭 로그를 안정적으로 연결하는 `click_id` 또는 공통 attribution key가 필요합니다.
-- 절감액 정확도를 높이려면 광고주/캠페인/키워드별 실제 CPC를 저장하거나 외부 광고 API에서 비용을 동기화해야 합니다.
-
-## 네이버/GFA 추적 파라미터
-
-네이버/GFA 연동은 보호 URL, 경유 URL, Redirect URL 방식을 지원하지 않습니다. 광고 최종 URL을 우리 서버 URL로 바꾸지 않으며, 스마트스토어/브랜드스토어/자사몰 랜딩 URL은 그대로 유지합니다.
-
-지원 방식:
-
-- 메뉴명: `추적 파라미터`
-- 화면: `/advertisers/tracking`
-- 메뉴 위치: 좌측 `광고주 관리` 섹션
-- 지원 채널: 파워링크, 쇼핑검색광고, GFA
-- 생성 결과: 네이버 광고 관리자 캠페인 추적 URL/파라미터 등록 영역에 붙여넣을 문자열
-- 광고계정 저장: 광고주별 `pm_advertisers.naver_account_id`에 네이버 광고계정 식별값 저장
-- 목적: 실시간 차단이 아니라 유입 분석, 반복 클릭 분석, 의심 클릭 리포트
-
-파워링크 예시:
-
-```text
-pm_adv=광고주ID&pm_account=네이버광고계정ID&pm_channel=naver_powerlink&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_ad_extension={ad_extension}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_ad_group_type={ad_group_type}
-```
-
-쇼핑검색광고 예시:
-
-```text
-pm_adv=광고주ID&pm_account=네이버광고계정ID&pm_channel=naver_shopping&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_mall_id={mall_id}&n_mall_pid={mall_pid}&n_ad_group_type={ad_group_type}
-```
-
-GFA 예시:
-
-```text
-pm_adv=광고주ID&pm_account=네이버광고계정ID&pm_channel=naver_gfa&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
-```
-
-네이버 설정 기준:
-
-- 네이버 광고관리자에서는 `자동 추적URL 파라미터` 영역을 사용합니다.
-- `추적 경유 사이트`는 사용하지 않습니다.
-- `{{final_url}}`, `final_url`, `n_final_url`은 사용하지 않습니다.
-- 기본 생성값은 `?` 또는 `&` 없이 `key=value&key=value` 형태입니다.
-- 네이버 입력란이 시작 문자를 요구하는 특수한 경우에만 사용자가 직접 `?` 또는 `&`를 앞에 붙입니다.
-
-광고 등록 전에는 반드시 실제 랜딩 URL에 파라미터를 붙여 정상 접속과 `pm_click_logs` 저장 여부를 테스트합니다.
-
-광고주 식별값은 화면 노출 부담을 줄이기 위해 `client_id`, `project_key`, `advertiser_id 앞 8자리` 순서로 사용합니다. DB 권한 조회와 실제 접근 제한은 계속 내부 `advertiser_id` 기준으로 처리합니다.
-
-저장 매핑:
-
-- `pm_channel`: 유입 분류 최우선 값이며 `utm_source`에 저장합니다.
-- `pm_account` 또는 `n_media`: `utm_medium`에 저장합니다.
-- `n_campaign`: `utm_campaign`에 저장합니다.
-- `n_keyword` 또는 `n_query`: `utm_term`에 저장합니다.
-- `n_ad_group`, `n_group`, `n_ad`, `n_keyword_id`, `n_mall_pid`: `utm_content`에 요약 저장합니다.
-
-지원하지 않는 항목:
-
-- `/api/r/*` 경유 URL
-- `/api/tracking-links` 보호 URL 생성 API
-- `n_final_url` 기반 Redirect URL
-- 광고 랜딩 URL을 우리 서버 URL로 바꾸는 방식
 
 
 API가 `DB_ROLE_CONSTRAINT_MISMATCH`를 반환하면 위 SQL을 Supabase SQL Editor에 반영한 뒤 광고주 생성을 다시 시도합니다.

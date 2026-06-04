@@ -128,11 +128,15 @@ alter table public.pm_advertisers add column if not exists blocking_enabled bool
 alter table public.pm_advertisers add column if not exists naver_account_id text;
 
 alter table public.pm_click_logs add column if not exists client_id text;
+alter table public.pm_click_logs add column if not exists project_key text;
 alter table public.pm_click_logs add column if not exists visitor_id text;
 alter table public.pm_click_logs add column if not exists session_id text;
 alter table public.pm_click_logs add column if not exists user_agent text;
 alter table public.pm_click_logs add column if not exists page_url text;
 alter table public.pm_click_logs add column if not exists referrer text;
+alter table public.pm_click_logs add column if not exists media text;
+alter table public.pm_click_logs add column if not exists campaign text;
+alter table public.pm_click_logs add column if not exists keyword text;
 alter table public.pm_click_logs add column if not exists utm_source text;
 alter table public.pm_click_logs add column if not exists utm_medium text;
 alter table public.pm_click_logs add column if not exists utm_campaign text;

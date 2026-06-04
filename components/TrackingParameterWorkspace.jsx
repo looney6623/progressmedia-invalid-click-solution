@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Save, SlidersHorizontal } from "lucide-react";
+import { Copy, Save, ShieldCheck } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { useAppState } from "@/components/AppStateProvider";
 import { Card } from "@/components/ui";
+
+const TRACKING_BASE_URL = "https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app";
 
 const CHANNELS = [
   {
     value: "naver_powerlink",
     label: "네이버 파워링크",
     params: [
-      ["pm_channel", "naver_powerlink"],
       ["n_campaign", "{campaign}"],
       ["n_ad_group", "{ad_group}"],
       ["n_media", "{media}"],
@@ -31,7 +32,6 @@ const CHANNELS = [
     value: "naver_shopping",
     label: "네이버 쇼핑검색광고",
     params: [
-      ["pm_channel", "naver_shopping"],
       ["n_campaign", "{campaign}"],
       ["n_ad_group", "{ad_group}"],
       ["n_media", "{media}"],
@@ -52,7 +52,6 @@ const CHANNELS = [
     value: "naver_gfa",
     label: "네이버 GFA",
     params: [
-      ["pm_channel", "naver_gfa"],
       ["n_campaign", "{campaign}"],
       ["n_group", "{group}"],
       ["n_ad", "{ad}"],
@@ -64,8 +63,8 @@ const CHANNELS = [
 
 const steps = [
   "네이버 광고관리자에서 캠페인 설정으로 이동",
-  "추적 URL 설정에서 자동 추적URL 파라미터 선택",
-  "생성된 파라미터를 붙여넣기",
+  "추적 URL 설정에서 추적 경유 사이트 선택",
+  "생성된 URL을 붙여넣기",
   "저장 후 테스트 클릭으로 정상 랜딩 확인"
 ];
 
@@ -74,24 +73,26 @@ function visibleAdvertiserId(advertiser) {
   return advertiser.clientId || advertiser.projectKey || String(advertiser.id || "").slice(0, 8);
 }
 
-function encodeParam(value) {
+function encodeTrackingValue(value) {
   const text = String(value || "");
   if (/^\{[^}]+\}$/.test(text)) return text;
   return encodeURIComponent(text);
 }
 
-function buildParameterBody({ advertiserKey, accountId, channel }) {
+function buildTrackingUrl({ advertiserKey, accountId, channel }) {
   const selected = CHANNELS.find((item) => item.value === channel) || CHANNELS[0];
   const pairs = [
     ["pm_adv", advertiserKey],
     ["pm_account", accountId],
+    ["n_final_url", "{final_url}"],
     ...selected.params
   ];
-  return pairs.map(([key, value]) => `${key}=${encodeParam(value)}`).join("&");
+  const query = pairs.map(([key, value]) => `${key}=${encodeTrackingValue(value)}`).join("&");
+  return `${TRACKING_BASE_URL}/api/r/${selected.value}?${query}`;
 }
 
-function multilinePreview(text) {
-  return text ? text.replace(/&/g, "\n&") : "";
+function multilinePreview(url) {
+  return url ? url.replace(/\?/g, "?\n").replace(/&/g, "\n&") : "";
 }
 
 export default function TrackingParameterWorkspace() {
@@ -131,9 +132,9 @@ export default function TrackingParameterWorkspace() {
     setForm((prev) => ({ ...prev, accountId: selectedNaverAccountId }));
   }, [selectedAdvertiserId, selectedNaverAccountId]);
 
-  const parameterString = useMemo(() => {
+  const trackingUrl = useMemo(() => {
     if (!advertiserKey || !form.accountId.trim()) return "";
-    return buildParameterBody({
+    return buildTrackingUrl({
       advertiserKey,
       accountId: form.accountId.trim(),
       channel: form.channel
@@ -166,13 +167,13 @@ export default function TrackingParameterWorkspace() {
   async function copy(text) {
     if (!text) return;
     await navigator.clipboard?.writeText(text);
-    setNotice("자동 추적URL 파라미터를 복사했습니다.");
+    setNotice("네이버 경유 추적 URL을 복사했습니다.");
   }
 
   return (
     <AppShell
-      title="추적 파라미터"
-      description="네이버 광고관리자의 자동 추적URL 파라미터 영역에 붙여넣을 문자열을 생성합니다."
+      title="네이버 경유 추적 URL"
+      description="네이버 광고관리자의 추적 경유 사이트에 등록할 URL을 생성합니다. 광고 클릭 시 먼저 로그를 기록한 뒤 정상 클릭만 최종 랜딩으로 이동합니다."
     >
       {(notice || error) && (
         <Card className={`p-4 text-sm ${error ? "border-danger/30 bg-danger/10 text-danger" : "border-brand/30 bg-brand/10 text-brand"}`}>
@@ -181,17 +182,17 @@ export default function TrackingParameterWorkspace() {
       )}
 
       <Card className="border-warning/30 bg-warning/10 p-4 text-sm leading-6 text-warning">
-        <p className="font-semibold">추적 경유 사이트가 아니라 자동 추적URL 파라미터에 등록해주세요.</p>
-        <p>이 기능은 광고 랜딩 URL을 우리 서버로 바꾸지 않습니다.</p>
-        <p>생성된 파라미터를 광고 캠페인의 자동 추적URL 파라미터 영역에 등록해주세요.</p>
+        <p className="font-semibold">생성된 URL에는 n_final_url={"{"}final_url{"}"}이 포함되어야 합니다.</p>
+        <p>광고 등록 전 반드시 테스트 클릭으로 정상 랜딩을 확인하세요.</p>
+        <p>최종 랜딩 URL은 광고주 사이트 URL과 같은 도메인만 허용됩니다.</p>
       </Card>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <Card>
           <div className="border-b border-line px-5 py-4">
-            <h2 className="text-sm font-bold text-white">광고주 계정 정보</h2>
+            <h2 className="text-sm font-bold text-white">광고주와 채널 설정</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              광고주별 네이버 광고계정 식별값을 저장하면 다음 접속 때 자동으로 불러옵니다.
+              광고주별 네이버 광고계정 식별값을 저장하고 채널별 경유 추적 URL을 생성합니다.
             </p>
           </div>
           <div className="space-y-4 p-5">
@@ -206,7 +207,9 @@ export default function TrackingParameterWorkspace() {
             <div className="rounded-md border border-line bg-ink px-4 py-3">
               <p className="text-xs font-semibold text-slate-500">광고주 식별값</p>
               <p className="mt-1 font-mono text-sm text-brand">{advertiserKey || "-"}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">파라미터 표시용 값입니다. DB 조회 권한은 실제 advertiser_id 기준으로 유지됩니다.</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                생성 URL의 pm_adv 값입니다. 서버는 client_id, project_key, 광고주 ID 기준으로 광고주를 확인합니다.
+              </p>
             </div>
 
             <label className="block">
@@ -256,24 +259,24 @@ export default function TrackingParameterWorkspace() {
         <Card>
           <div className="border-b border-line px-5 py-4">
             <h2 className="flex items-center gap-2 text-sm font-bold text-white">
-              <SlidersHorizontal size={16} className="text-brand" />
-              생성된 파라미터
+              <ShieldCheck size={16} className="text-brand" />
+              생성 URL
             </h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              네이버 자동 추적URL 파라미터 입력란에 아래 문자열을 그대로 붙여넣습니다.
+              네이버 광고관리자의 추적 경유 사이트 입력란에 아래 URL을 그대로 붙여넣습니다.
             </p>
           </div>
           <div className="space-y-4 p-5">
             <div className="rounded-lg border border-line bg-panelSoft p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-white">복사용 한 줄 문자열</h3>
-                  <p className="mt-1 text-xs text-slate-500">기본 생성값은 시작 문자 없이 key=value&key=value 형태입니다.</p>
+                  <h3 className="text-sm font-bold text-white">복사할 경유 추적 URL</h3>
+                  <p className="mt-1 text-xs text-slate-500">정상/의심 클릭은 최종 랜딩으로 이동하고, 차단 대상 IP는 이동하지 않습니다.</p>
                 </div>
                 <button
                   type="button"
-                  disabled={!parameterString}
-                  onClick={() => copy(parameterString)}
+                  disabled={!trackingUrl}
+                  onClick={() => copy(trackingUrl)}
                   className="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-3 text-xs font-bold text-ink disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Copy size={14} />
@@ -281,19 +284,19 @@ export default function TrackingParameterWorkspace() {
                 </button>
               </div>
               <div className="mt-4 rounded-md border border-line bg-ink p-3 font-mono text-xs leading-5 text-slate-300 break-all">
-                {parameterString || "광고주와 네이버 광고계정 식별값을 입력하면 생성됩니다."}
+                {trackingUrl || "광고주와 네이버 광고계정 식별값을 입력하면 경유 추적 URL이 생성됩니다."}
               </div>
             </div>
 
             <div className="rounded-lg border border-line bg-panelSoft p-4">
               <h3 className="text-sm font-bold text-white">줄바꿈 미리보기</h3>
-              <pre className="mt-3 max-h-80 overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-400">
-                {parameterString ? multilinePreview(parameterString) : "줄바꿈 미리보기"}
+              <pre className="mt-3 max-h-96 overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-400">
+                {trackingUrl ? multilinePreview(trackingUrl) : "줄바꿈 미리보기"}
               </pre>
             </div>
 
             <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-xs leading-5 text-warning">
-              네이버 입력란이 시작 문자 입력을 요구하는 특수한 경우에만 직접 앞에 ? 또는 &를 붙입니다. 광고 등록 전 테스트 클릭으로 정상 랜딩을 확인하세요.
+              네이버가 테스트 클릭에서 {"{"}final_url{"}"} 매크로를 실제 랜딩 URL로 치환해야 정상 이동합니다. 최종 URL 도메인이 광고주 사이트 URL과 다르면 서버가 403으로 차단합니다.
             </div>
           </div>
         </Card>
