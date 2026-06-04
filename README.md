@@ -226,15 +226,15 @@ notify pgrst, 'reload schema';
 
 ## Naver URL registration validation
 
-When Naver Ads validates a tracking redirect URL, it can call the endpoint without a real landing URL. In that validation request, `n_final_url` may be missing or may arrive unchanged as `{final_url}` or `{{final_url}}`.
+When Naver Ads validates a tracking redirect URL, it can call the endpoint without a real landing URL. In that validation request, `url` or `n_final_url` may be missing or may arrive unchanged as `{final_url}` or `{{final_url}}`.
 
-ProgressMedia treats that request as a Naver save-validation check. If `pm_adv` matches an advertiser and that advertiser has a registered `site_url`, the server redirects to that `site_url` with HTTP 302 without saving a click log. If `pm_adv` is missing, the advertiser cannot be found, or `site_url` is empty, the server falls back to HTTP 200 with the plain text body `ProgressMedia tracking endpoint ready`. Final URL validation, click logging, blocked-IP checks, and 302 redirect run only when `n_final_url` or `final_url` contains a real `http` or `https` URL.
+ProgressMedia treats that request as a Naver save-validation check. If `aid` or `pm_adv` matches an advertiser and that advertiser has a registered `site_url`, the server redirects to that `site_url` with HTTP 302 without saving a click log. If the advertiser key is missing, the advertiser cannot be found, or `site_url` is empty, the server falls back to HTTP 200 with the plain text body `ProgressMedia tracking endpoint ready`. Final URL validation, click logging, blocked-IP checks, and 302 redirect run only when `url`, `n_final_url`, or `final_url` contains a real `http` or `https` URL.
 
 ## 네이버 경유 추적 URL 운영 기준
 
 네이버/GFA 연동은 네이버 광고관리자의 `추적 경유 사이트`에 등록할 URL을 생성하는 방식으로 운영합니다. 마케터는 먼저 광고주/사이트 등록에서 랜딩 URL인 `site_url`을 등록하고, 추적 URL 화면에서는 광고주를 선택하기만 하면 됩니다. 시스템은 내부 광고주 식별값을 자동으로 넣어 경유 추적 URL을 생성합니다.
 
-광고 클릭은 먼저 프로그레스미디어 서버의 `/api/r/{channel}` 라우트로 들어오고, 서버가 클릭 로그를 저장한 뒤 정상 또는 의심 클릭이면 `n_final_url`의 최종 랜딩 URL로 302 리다이렉트합니다. 활성 차단 IP 또는 자동 차단 판정 클릭은 최종 랜딩으로 보내지 않고 `/blocked-click`으로 이동합니다.
+광고 클릭은 먼저 프로그레스미디어 서버의 `/r/naver` 라우트로 들어오고, 서버가 클릭 로그를 저장한 뒤 정상 또는 의심 클릭이면 `url`의 최종 랜딩 URL로 302 리다이렉트합니다. 기존 긴 URL인 `/api/r/{channel}`도 계속 지원합니다. 활성 차단 IP 또는 자동 차단 판정 클릭은 최종 랜딩으로 보내지 않고 `/blocked-click`으로 이동합니다.
 
 운영 URL:
 
@@ -248,8 +248,9 @@ https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudt
 - 화면: `/advertisers/tracking`
 - 메뉴 위치: 좌측 `광고주 관리` 섹션
 - 지원 채널: 파워링크, 쇼핑검색광고, GFA
-- 필수 매크로: `n_final_url={{final_url}}`
-- 광고주 사이트 도메인 검증: `n_final_url`의 도메인은 `pm_advertisers.site_url` 도메인과 같아야 합니다.
+- 기본 등록 URL: `/r/naver?c={채널}&aid={광고주식별값}&url={{final_url}}`
+- 필수 매크로: `url={{final_url}}`
+- 광고주 사이트 도메인 검증: `url`의 도메인은 `pm_advertisers.site_url` 도메인과 같아야 합니다.
 
 운영 흐름:
 
@@ -262,27 +263,36 @@ https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudt
 파워링크 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_powerlink?pm_adv={자동광고주식별값}&n_final_url={{final_url}}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_ad_extension={ad_extension}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_ad_group_type={ad_group_type}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/r/naver?c=pl&aid={자동광고주식별값}&url={{final_url}}
 ```
 
 쇼핑검색광고 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_shopping?pm_adv={자동광고주식별값}&n_final_url={{final_url}}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_mall_id={mall_id}&n_mall_pid={mall_pid}&n_ad_group_type={ad_group_type}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/r/naver?c=ns&aid={자동광고주식별값}&url={{final_url}}
 ```
 
 GFA 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_gfa?pm_adv={자동광고주식별값}&n_final_url={{final_url}}&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/r/naver?c=gfa&aid={자동광고주식별값}&url={{final_url}}
 ```
 
-네이버 광고계정 식별값을 입력한 경우에만 `pm_account={입력값}` 파라미터를 추가합니다. 입력하지 않으면 `pm_account`는 생성하지 않습니다.
+네이버 광고계정 식별값을 입력한 경우에만 `acc={입력값}` 파라미터를 추가합니다. 입력하지 않으면 `acc`는 생성하지 않습니다.
+
+지원하는 채널 값:
+
+- 파워링크: `powerlink` 또는 `pl`
+- 쇼핑검색광고: `shopping` 또는 `ns`
+- GFA: `gfa`
+
+기존 긴 URL도 유지됩니다. `/api/r/naver_powerlink`, `/api/r/naver_shopping`, `/api/r/naver_gfa`는 `pm_adv`, `pm_account`, `n_final_url` 파라미터를 계속 받을 수 있습니다.
 
 저장 매핑:
 
-- `pm_adv`: 시스템이 자동 생성하는 광고주 조회 키입니다.
-- `pm_account`: 선택 입력값이며 광고계정 구분용 보조값으로 저장합니다.
+- `aid`: 시스템이 자동 생성하는 광고주 조회 키입니다.
+- `acc`: 선택 입력값이며 광고계정 구분용 보조값으로 저장합니다.
+- `url`: 네이버가 최종 랜딩 URL로 치환하는 값입니다.
 - `channel` 또는 `n_media`: `media`, `utm_source`, `utm_medium` 분석에 사용합니다.
 - `n_campaign`: `campaign`, `utm_campaign`에 저장합니다.
 - `n_keyword` 또는 `n_query`: `keyword`, `utm_term`에 저장합니다.
@@ -290,7 +300,7 @@ https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudt
 
 보안 및 QA:
 
-- `n_final_url`은 `http` 또는 `https`만 허용합니다.
+- `url` 또는 `n_final_url`은 `http` 또는 `https`만 허용합니다.
 - `javascript:`, `data:`, `file:` 프로토콜은 차단합니다.
 - `site_url` 도메인과 다른 `final_url`은 403으로 차단합니다.
 - IP 원문은 저장하지 않고 `ip_hash`, `ip_masked`만 저장합니다.

@@ -11,6 +11,7 @@ const TRACKING_BASE_URL = "https://port-0-progressmedia-invalid-click-solution-m
 const CHANNELS = [
   {
     value: "naver_powerlink",
+    shortValue: "pl",
     label: "네이버 파워링크",
     params: [
       ["n_campaign", "{campaign}"],
@@ -30,6 +31,7 @@ const CHANNELS = [
   },
   {
     value: "naver_shopping",
+    shortValue: "ns",
     label: "네이버 쇼핑검색광고",
     params: [
       ["n_campaign", "{campaign}"],
@@ -50,6 +52,7 @@ const CHANNELS = [
   },
   {
     value: "naver_gfa",
+    shortValue: "gfa",
     label: "네이버 GFA",
     params: [
       ["n_campaign", "{campaign}"],
@@ -83,13 +86,13 @@ function encodeTrackingValue(value) {
 function buildTrackingUrl({ advertiserKey, accountId, channel }) {
   const selected = CHANNELS.find((item) => item.value === channel) || CHANNELS[0];
   const pairs = [
-    ["pm_adv", advertiserKey],
-    ...(accountId ? [["pm_account", accountId]] : []),
-    ["n_final_url", "{{final_url}}"],
-    ...selected.params
+    ["c", selected.shortValue],
+    ["aid", advertiserKey],
+    ...(accountId ? [["acc", accountId]] : []),
+    ["url", "{{final_url}}"]
   ];
   const query = pairs.map(([key, value]) => `${key}=${encodeTrackingValue(value)}`).join("&");
-  return `${TRACKING_BASE_URL}/api/r/${selected.value}?${query}`;
+  return `${TRACKING_BASE_URL}/r/naver?${query}`;
 }
 
 function multilinePreview(url) {
@@ -222,7 +225,7 @@ export default function TrackingParameterWorkspace() {
                 className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-brand"
               />
               <span className="mt-2 block text-xs leading-5 text-slate-500">
-                네이버 광고계정이 여러 개인 경우 구분용으로 입력하세요. 입력하지 않으면 pm_account 파라미터는 생성하지 않습니다.
+                네이버 광고계정이 여러 개인 경우 구분용으로 입력하세요. 입력하지 않으면 acc 파라미터는 생성하지 않습니다.
               </span>
             </label>
 
@@ -272,7 +275,7 @@ export default function TrackingParameterWorkspace() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-white">복사할 URL</h3>
-                  <p className="mt-1 text-xs text-slate-500">URL에는 n_final_url={"{{final_url}}"} 매크로가 포함됩니다.</p>
+                  <p className="mt-1 text-xs text-slate-500">URL에는 url={"{{final_url}}"} 매크로가 포함됩니다.</p>
                 </div>
                 <button
                   type="button"
