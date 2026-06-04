@@ -248,7 +248,7 @@ https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudt
 - 화면: `/advertisers/tracking`
 - 메뉴 위치: 좌측 `광고주 관리` 섹션
 - 지원 채널: 파워링크, 쇼핑검색광고, GFA
-- 필수 매크로: `n_final_url={final_url}`
+- 필수 매크로: `n_final_url={{final_url}}`
 - 광고주 사이트 도메인 검증: `n_final_url`의 도메인은 `pm_advertisers.site_url` 도메인과 같아야 합니다.
 
 운영 흐름:
@@ -262,19 +262,19 @@ https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudt
 파워링크 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_powerlink?pm_adv={자동광고주식별값}&n_final_url={final_url}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_ad_extension={ad_extension}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_ad_group_type={ad_group_type}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_powerlink?pm_adv={자동광고주식별값}&n_final_url={{final_url}}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_ad_extension={ad_extension}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_ad_group_type={ad_group_type}
 ```
 
 쇼핑검색광고 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_shopping?pm_adv={자동광고주식별값}&n_final_url={final_url}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_mall_id={mall_id}&n_mall_pid={mall_pid}&n_ad_group_type={ad_group_type}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_shopping?pm_adv={자동광고주식별값}&n_final_url={{final_url}}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_mall_id={mall_id}&n_mall_pid={mall_pid}&n_ad_group_type={ad_group_type}
 ```
 
 GFA 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_gfa?pm_adv={자동광고주식별값}&n_final_url={final_url}&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_gfa?pm_adv={자동광고주식별값}&n_final_url={{final_url}}&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
 ```
 
 네이버 광고계정 식별값을 입력한 경우에만 `pm_account={입력값}` 파라미터를 추가합니다. 입력하지 않으면 `pm_account`는 생성하지 않습니다.

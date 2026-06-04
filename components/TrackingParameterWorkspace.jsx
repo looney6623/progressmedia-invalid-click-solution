@@ -75,6 +75,7 @@ function resolveAdvertiserKey(advertiser) {
 
 function encodeTrackingValue(value) {
   const text = String(value || "");
+  if (text === "{{final_url}}") return text;
   if (/^\{[^}]+\}$/.test(text)) return text;
   return encodeURIComponent(text);
 }
@@ -84,7 +85,7 @@ function buildTrackingUrl({ advertiserKey, accountId, channel }) {
   const pairs = [
     ["pm_adv", advertiserKey],
     ...(accountId ? [["pm_account", accountId]] : []),
-    ["n_final_url", "{final_url}"],
+    ["n_final_url", "{{final_url}}"],
     ...selected.params
   ];
   const query = pairs.map(([key, value]) => `${key}=${encodeTrackingValue(value)}`).join("&");
@@ -271,7 +272,7 @@ export default function TrackingParameterWorkspace() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-white">복사할 URL</h3>
-                  <p className="mt-1 text-xs text-slate-500">URL에는 n_final_url={"{"}final_url{"}"} 매크로가 포함됩니다.</p>
+                  <p className="mt-1 text-xs text-slate-500">URL에는 n_final_url={"{{final_url}}"} 매크로가 포함됩니다.</p>
                 </div>
                 <button
                   type="button"
@@ -296,7 +297,7 @@ export default function TrackingParameterWorkspace() {
             </div>
 
             <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-xs leading-5 text-warning">
-              네이버가 테스트 클릭에서 {"{"}final_url{"}"} 매크로를 실제 랜딩 URL로 치환해야 정상 이동합니다. 최종 URL 도메인이 등록된 랜딩 URL과 다르면 서버가 403으로 차단합니다.
+              네이버가 테스트 클릭에서 {"{{final_url}}"} 매크로를 실제 랜딩 URL로 치환해야 정상 이동합니다. 최종 URL 도메인이 등록된 랜딩 URL과 다르면 서버가 403으로 차단합니다.
             </div>
           </div>
         </Card>
