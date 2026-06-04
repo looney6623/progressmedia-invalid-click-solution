@@ -62,15 +62,15 @@ const CHANNELS = [
 ];
 
 const steps = [
-  "네이버 광고관리자에서 캠페인 설정으로 이동",
-  "추적 URL 설정에서 추적 경유 사이트 선택",
-  "생성된 URL을 붙여넣기",
-  "저장 후 테스트 클릭으로 정상 랜딩 확인"
+  "광고주/사이트 등록에 랜딩 URL을 먼저 등록합니다.",
+  "네이버 광고관리자에서 캠페인 설정으로 이동합니다.",
+  "추적 URL 설정에서 추적 경유 사이트를 선택합니다.",
+  "생성된 URL을 붙여넣고 테스트 클릭으로 정상 랜딩을 확인합니다."
 ];
 
-function visibleAdvertiserId(advertiser) {
+function resolveAdvertiserKey(advertiser) {
   if (!advertiser) return "";
-  return advertiser.clientId || advertiser.projectKey || String(advertiser.id || "").slice(0, 8);
+  return advertiser.clientId || advertiser.projectKey || advertiser.id || "";
 }
 
 function encodeTrackingValue(value) {
@@ -83,7 +83,7 @@ function buildTrackingUrl({ advertiserKey, accountId, channel }) {
   const selected = CHANNELS.find((item) => item.value === channel) || CHANNELS[0];
   const pairs = [
     ["pm_adv", advertiserKey],
-    ["pm_account", accountId],
+    ...(accountId ? [["pm_account", accountId]] : []),
     ["n_final_url", "{final_url}"],
     ...selected.params
   ];
@@ -113,9 +113,10 @@ export default function TrackingParameterWorkspace() {
   });
 
   const selectedAdvertiser = advertisers.find((item) => item.id === form.advertiserId);
-  const advertiserKey = visibleAdvertiserId(selectedAdvertiser);
+  const advertiserKey = resolveAdvertiserKey(selectedAdvertiser);
   const selectedAdvertiserId = selectedAdvertiser?.id || "";
   const selectedNaverAccountId = selectedAdvertiser?.naverAccountId || "";
+  const siteUrl = selectedAdvertiser?.siteUrl || "";
 
   useEffect(() => {
     if (!form.advertiserId && advertisers[0]?.id) {
@@ -133,13 +134,13 @@ export default function TrackingParameterWorkspace() {
   }, [selectedAdvertiserId, selectedNaverAccountId]);
 
   const trackingUrl = useMemo(() => {
-    if (!advertiserKey || !form.accountId.trim()) return "";
+    if (!advertiserKey || !siteUrl) return "";
     return buildTrackingUrl({
       advertiserKey,
       accountId: form.accountId.trim(),
       channel: form.channel
     });
-  }, [advertiserKey, form.accountId, form.channel]);
+  }, [advertiserKey, form.accountId, form.channel, siteUrl]);
 
   function update(key, value) {
     setNotice("");
@@ -173,7 +174,7 @@ export default function TrackingParameterWorkspace() {
   return (
     <AppShell
       title="네이버 경유 추적 URL"
-      description="네이버 광고관리자의 추적 경유 사이트에 등록할 URL을 생성합니다. 광고 클릭 시 먼저 로그를 기록한 뒤 정상 클릭만 최종 랜딩으로 이동합니다."
+      description="광고주/사이트 등록에 입력한 랜딩 URL을 기준으로 네이버 광고관리자의 추적 경유 사이트에 등록할 URL을 생성합니다."
     >
       {(notice || error) && (
         <Card className={`p-4 text-sm ${error ? "border-danger/30 bg-danger/10 text-danger" : "border-brand/30 bg-brand/10 text-brand"}`}>
@@ -182,9 +183,9 @@ export default function TrackingParameterWorkspace() {
       )}
 
       <Card className="border-warning/30 bg-warning/10 p-4 text-sm leading-6 text-warning">
-        <p className="font-semibold">생성된 URL에는 n_final_url={"{"}final_url{"}"}이 포함되어야 합니다.</p>
-        <p>광고 등록 전 반드시 테스트 클릭으로 정상 랜딩을 확인하세요.</p>
-        <p>최종 랜딩 URL은 광고주 사이트 URL과 같은 도메인만 허용됩니다.</p>
+        <p className="font-semibold">생성된 URL을 네이버 광고관리자의 추적 경유 사이트에 등록해주세요.</p>
+        <p>등록 전 테스트 클릭으로 정상 랜딩 여부를 확인하세요.</p>
+        <p>차단 대상 클릭은 최종 랜딩으로 이동하지 않을 수 있습니다.</p>
       </Card>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
@@ -192,7 +193,7 @@ export default function TrackingParameterWorkspace() {
           <div className="border-b border-line px-5 py-4">
             <h2 className="text-sm font-bold text-white">광고주와 채널 설정</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              광고주별 네이버 광고계정 식별값을 저장하고 채널별 경유 추적 URL을 생성합니다.
+              마케터는 광고주를 선택하고 채널만 고르면 됩니다. 추적에 필요한 내부 값은 시스템이 자동으로 처리합니다.
             </p>
           </div>
           <div className="space-y-4 p-5">
@@ -204,16 +205,15 @@ export default function TrackingParameterWorkspace() {
               </select>
             </label>
 
-            <div className="rounded-md border border-line bg-ink px-4 py-3">
-              <p className="text-xs font-semibold text-slate-500">광고주 식별값</p>
-              <p className="mt-1 font-mono text-sm text-brand">{advertiserKey || "-"}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                생성 URL의 pm_adv 값입니다. 서버는 client_id, project_key, 광고주 ID 기준으로 광고주를 확인합니다.
+            <div className={`rounded-md border px-4 py-3 ${siteUrl ? "border-line bg-ink" : "border-warning/30 bg-warning/10"}`}>
+              <p className="text-xs font-semibold text-slate-500">등록된 랜딩 URL</p>
+              <p className={`mt-1 break-all text-sm ${siteUrl ? "text-slate-200" : "text-warning"}`}>
+                {siteUrl || "광고주/사이트 등록에서 랜딩 URL을 먼저 등록해주세요."}
               </p>
             </div>
 
             <label className="block">
-              <span className="text-xs font-semibold text-slate-500">네이버 광고계정 식별값</span>
+              <span className="text-xs font-semibold text-slate-500">네이버 광고계정 식별값 선택 입력</span>
               <input
                 value={form.accountId}
                 onChange={(event) => update("accountId", event.target.value)}
@@ -221,7 +221,7 @@ export default function TrackingParameterWorkspace() {
                 className="mt-1 h-10 w-full rounded-md border border-line bg-ink px-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-brand"
               />
               <span className="mt-2 block text-xs leading-5 text-slate-500">
-                네이버 광고계정 번호 또는 내부에서 구분할 계정명을 입력하세요. 예: 711579, NAVER_MAIN, 달빛여왕_검색광고
+                네이버 광고계정이 여러 개인 경우 구분용으로 입력하세요. 입력하지 않으면 pm_account 파라미터는 생성하지 않습니다.
               </span>
             </label>
 
@@ -243,7 +243,7 @@ export default function TrackingParameterWorkspace() {
             </label>
 
             <div className="rounded-md border border-line bg-ink px-4 py-3">
-              <p className="text-xs font-bold text-slate-400">네이버 등록 순서</p>
+              <p className="text-xs font-bold text-slate-400">등록 안내</p>
               <ol className="mt-3 space-y-2 text-xs leading-5 text-slate-500">
                 {steps.map((step, index) => (
                   <li key={step} className="flex gap-2">
@@ -260,7 +260,7 @@ export default function TrackingParameterWorkspace() {
           <div className="border-b border-line px-5 py-4">
             <h2 className="flex items-center gap-2 text-sm font-bold text-white">
               <ShieldCheck size={16} className="text-brand" />
-              생성 URL
+              생성된 경유 추적 URL
             </h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">
               네이버 광고관리자의 추적 경유 사이트 입력란에 아래 URL을 그대로 붙여넣습니다.
@@ -270,8 +270,8 @@ export default function TrackingParameterWorkspace() {
             <div className="rounded-lg border border-line bg-panelSoft p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-white">복사할 경유 추적 URL</h3>
-                  <p className="mt-1 text-xs text-slate-500">정상/의심 클릭은 최종 랜딩으로 이동하고, 차단 대상 IP는 이동하지 않습니다.</p>
+                  <h3 className="text-sm font-bold text-white">복사할 URL</h3>
+                  <p className="mt-1 text-xs text-slate-500">URL에는 n_final_url={"{"}final_url{"}"} 매크로가 포함됩니다.</p>
                 </div>
                 <button
                   type="button"
@@ -284,7 +284,7 @@ export default function TrackingParameterWorkspace() {
                 </button>
               </div>
               <div className="mt-4 rounded-md border border-line bg-ink p-3 font-mono text-xs leading-5 text-slate-300 break-all">
-                {trackingUrl || "광고주와 네이버 광고계정 식별값을 입력하면 경유 추적 URL이 생성됩니다."}
+                {trackingUrl || "광고주를 선택하고 등록된 랜딩 URL이 있으면 경유 추적 URL이 자동 생성됩니다."}
               </div>
             </div>
 
@@ -296,7 +296,7 @@ export default function TrackingParameterWorkspace() {
             </div>
 
             <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-xs leading-5 text-warning">
-              네이버가 테스트 클릭에서 {"{"}final_url{"}"} 매크로를 실제 랜딩 URL로 치환해야 정상 이동합니다. 최종 URL 도메인이 광고주 사이트 URL과 다르면 서버가 403으로 차단합니다.
+              네이버가 테스트 클릭에서 {"{"}final_url{"}"} 매크로를 실제 랜딩 URL로 치환해야 정상 이동합니다. 최종 URL 도메인이 등록된 랜딩 URL과 다르면 서버가 403으로 차단합니다.
             </div>
           </div>
         </Card>

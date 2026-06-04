@@ -226,7 +226,9 @@ notify pgrst, 'reload schema';
 
 ## 네이버 경유 추적 URL 운영 기준
 
-네이버/GFA 연동은 네이버 광고관리자의 `추적 경유 사이트`에 등록할 URL을 생성하는 방식으로 운영합니다. 광고 클릭은 먼저 프로그레스미디어 서버의 `/api/r/{channel}` 라우트로 들어오고, 서버가 클릭 로그를 저장한 뒤 정상 또는 의심 클릭이면 `n_final_url`의 최종 랜딩 URL로 302 리다이렉트합니다. 활성 차단 IP 또는 자동 차단 판정 클릭은 최종 랜딩으로 보내지 않고 `/blocked-click`으로 이동합니다.
+네이버/GFA 연동은 네이버 광고관리자의 `추적 경유 사이트`에 등록할 URL을 생성하는 방식으로 운영합니다. 마케터는 먼저 광고주/사이트 등록에서 랜딩 URL인 `site_url`을 등록하고, 추적 URL 화면에서는 광고주를 선택하기만 하면 됩니다. 시스템은 내부 광고주 식별값을 자동으로 넣어 경유 추적 URL을 생성합니다.
+
+광고 클릭은 먼저 프로그레스미디어 서버의 `/api/r/{channel}` 라우트로 들어오고, 서버가 클릭 로그를 저장한 뒤 정상 또는 의심 클릭이면 `n_final_url`의 최종 랜딩 URL로 302 리다이렉트합니다. 활성 차단 IP 또는 자동 차단 판정 클릭은 최종 랜딩으로 보내지 않고 `/blocked-click`으로 이동합니다.
 
 운영 URL:
 
@@ -243,28 +245,38 @@ https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudt
 - 필수 매크로: `n_final_url={final_url}`
 - 광고주 사이트 도메인 검증: `n_final_url`의 도메인은 `pm_advertisers.site_url` 도메인과 같아야 합니다.
 
+운영 흐름:
+
+1. 마케터가 광고주/사이트 등록에서 랜딩 URL을 먼저 등록합니다.
+2. 추적 URL 화면에서 광고주를 선택하면 등록된 랜딩 URL을 기준으로 경유 URL이 자동 생성됩니다.
+3. 광고주 식별값은 시스템이 `client_id`, `project_key`, `advertiser_id` 순서로 자동 처리합니다.
+4. 네이버 광고계정 식별값은 선택값입니다. 여러 광고계정을 구분해야 할 때만 입력합니다.
+5. 광고 등록 전 테스트 클릭으로 정상 랜딩과 `pm_click_logs` 저장 여부를 확인합니다.
+
 파워링크 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_powerlink?pm_adv={advertiser_key}&pm_account={naver_account_id}&n_final_url={final_url}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_ad_extension={ad_extension}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_ad_group_type={ad_group_type}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_powerlink?pm_adv={자동광고주식별값}&n_final_url={final_url}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_ad_extension={ad_extension}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_ad_group_type={ad_group_type}
 ```
 
 쇼핑검색광고 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_shopping?pm_adv={advertiser_key}&pm_account={naver_account_id}&n_final_url={final_url}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_mall_id={mall_id}&n_mall_pid={mall_pid}&n_ad_group_type={ad_group_type}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_shopping?pm_adv={자동광고주식별값}&n_final_url={final_url}&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_mall_id={mall_id}&n_mall_pid={mall_pid}&n_ad_group_type={ad_group_type}
 ```
 
 GFA 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_gfa?pm_adv={advertiser_key}&pm_account={naver_account_id}&n_final_url={final_url}&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/api/r/naver_gfa?pm_adv={자동광고주식별값}&n_final_url={final_url}&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
 ```
+
+네이버 광고계정 식별값을 입력한 경우에만 `pm_account={입력값}` 파라미터를 추가합니다. 입력하지 않으면 `pm_account`는 생성하지 않습니다.
 
 저장 매핑:
 
-- `pm_adv`: 광고주 조회 키입니다. 서버는 `client_id`, `project_key`, 광고주 ID, 광고주 ID 앞부분 순서로 조회합니다.
-- `pm_account`: `utm_medium` 보조값으로 저장합니다.
+- `pm_adv`: 시스템이 자동 생성하는 광고주 조회 키입니다.
+- `pm_account`: 선택 입력값이며 광고계정 구분용 보조값으로 저장합니다.
 - `channel` 또는 `n_media`: `media`, `utm_source`, `utm_medium` 분석에 사용합니다.
 - `n_campaign`: `campaign`, `utm_campaign`에 저장합니다.
 - `n_keyword` 또는 `n_query`: `keyword`, `utm_term`에 저장합니다.
@@ -274,6 +286,7 @@ https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudt
 
 - `n_final_url`은 `http` 또는 `https`만 허용합니다.
 - `javascript:`, `data:`, `file:` 프로토콜은 차단합니다.
+- `site_url` 도메인과 다른 `final_url`은 403으로 차단합니다.
 - IP 원문은 저장하지 않고 `ip_hash`, `ip_masked`만 저장합니다.
 - 활성 차단 IP는 `blocking_enabled=false` 상태에서도 최종 랜딩으로 보내지 않습니다.
 - 광고 등록 전 테스트 클릭으로 정상 랜딩과 `pm_click_logs` 저장 여부를 반드시 확인합니다.
