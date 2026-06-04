@@ -228,7 +228,7 @@ notify pgrst, 'reload schema';
 
 When Naver Ads validates a tracking redirect URL, it can call the endpoint without a real landing URL. In that validation request, `n_final_url` may be missing or may arrive unchanged as `{final_url}` or `{{final_url}}`.
 
-ProgressMedia treats that request as an endpoint readiness check. The server returns HTTP 200 with the plain text body `ProgressMedia tracking endpoint ready`, does not save a click log, and does not redirect. Final URL validation, click logging, blocked-IP checks, and 302 redirect run only when `n_final_url` or `final_url` contains a real `http` or `https` URL.
+ProgressMedia treats that request as a Naver save-validation check. If `pm_adv` matches an advertiser and that advertiser has a registered `site_url`, the server redirects to that `site_url` with HTTP 302 without saving a click log. If `pm_adv` is missing, the advertiser cannot be found, or `site_url` is empty, the server falls back to HTTP 200 with the plain text body `ProgressMedia tracking endpoint ready`. Final URL validation, click logging, blocked-IP checks, and 302 redirect run only when `n_final_url` or `final_url` contains a real `http` or `https` URL.
 
 ## 네이버 경유 추적 URL 운영 기준
 

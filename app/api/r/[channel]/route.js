@@ -51,6 +51,24 @@ function isFinalUrlPlaceholder(value) {
   return normalized === "{final_url}" || normalized === "{{final_url}}";
 }
 
+function isValidationRequest(finalUrlValue) {
+  return !finalUrlValue || isFinalUrlPlaceholder(finalUrlValue);
+}
+
+async function redirectToAdvertiserSiteUrl(request, advertiserKey) {
+  if (!advertiserKey || !hasServerSupabaseConfig()) return readyText();
+
+  const supabase = createSupabaseServiceClient();
+  try {
+    const advertiser = await findAdvertiser(supabase, advertiserKey);
+    const siteUrl = safeUrl(advertiser?.site_url || "");
+    if (!advertiser || !siteUrl) return readyText();
+    return NextResponse.redirect(siteUrl, { status: 302 });
+  } catch {
+    return readyText();
+  }
+}
+
 async function findAdvertiser(supabase, advertiserKey) {
   const columns = "id,name,client_id,project_key,site_url,status,blocking_enabled";
   const byClient = await supabase
@@ -172,8 +190,9 @@ export async function GET(request, context) {
   const advertiserKey = readParam(params, "pm_adv");
   const finalUrlValue = readParam(params, "n_final_url") || readParam(params, "final_url");
 
-  if (!finalUrlValue) return readyText();
-  if (isFinalUrlPlaceholder(finalUrlValue)) return readyText();
+  if (isValidationRequest(finalUrlValue)) {
+    return redirectToAdvertiserSiteUrl(request, advertiserKey);
+  }
   if (!advertiserKey) return json({ ok: false, error: "pm_adv is required" }, 400);
 
   const finalUrl = safeUrl(finalUrlValue);
