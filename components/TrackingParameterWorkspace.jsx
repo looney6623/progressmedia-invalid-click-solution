@@ -9,66 +9,16 @@ import { Card } from "@/components/ui";
 const TRACKING_BASE_URL = "https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app";
 
 const CHANNELS = [
-  {
-    value: "naver_powerlink",
-    shortValue: "pl",
-    label: "네이버 파워링크",
-    params: [
-      ["n_campaign", "{campaign}"],
-      ["n_ad_group", "{ad_group}"],
-      ["n_media", "{media}"],
-      ["n_ad", "{ad}"],
-      ["n_ad_extension", "{ad_extension}"],
-      ["n_keyword", "{keyword}"],
-      ["n_keyword_id", "{keyword_id}"],
-      ["n_query", "{query}"],
-      ["n_match", "{match}"],
-      ["n_network", "{network}"],
-      ["n_rank", "{rank}"],
-      ["n_campaign_type", "{campaign_type}"],
-      ["n_ad_group_type", "{ad_group_type}"]
-    ]
-  },
-  {
-    value: "naver_shopping",
-    shortValue: "ns",
-    label: "네이버 쇼핑검색광고",
-    params: [
-      ["n_campaign", "{campaign}"],
-      ["n_ad_group", "{ad_group}"],
-      ["n_media", "{media}"],
-      ["n_ad", "{ad}"],
-      ["n_keyword", "{keyword}"],
-      ["n_keyword_id", "{keyword_id}"],
-      ["n_query", "{query}"],
-      ["n_match", "{match}"],
-      ["n_network", "{network}"],
-      ["n_rank", "{rank}"],
-      ["n_campaign_type", "{campaign_type}"],
-      ["n_mall_id", "{mall_id}"],
-      ["n_mall_pid", "{mall_pid}"],
-      ["n_ad_group_type", "{ad_group_type}"]
-    ]
-  },
-  {
-    value: "naver_gfa",
-    shortValue: "gfa",
-    label: "네이버 GFA",
-    params: [
-      ["n_campaign", "{campaign}"],
-      ["n_group", "{group}"],
-      ["n_ad", "{ad}"],
-      ["n_media", "{media}"],
-      ["n_mall_pid", "{mall_pid}"]
-    ]
-  }
+  { value: "naver_powerlink", shortValue: "powerlink", label: "네이버 파워링크" },
+  { value: "naver_shopping", shortValue: "shopping", label: "네이버 쇼핑검색광고" },
+  { value: "naver_gfa", shortValue: "gfa", label: "네이버 GFA" }
 ];
 
 const steps = [
-  "광고주/사이트 등록에 랜딩 URL을 먼저 등록합니다.",
-  "네이버 광고관리자에서 캠페인 설정으로 이동합니다.",
+  "광고주/사이트 등록에 입력한 랜딩 URL을 기준으로 생성합니다.",
+  "네이버 광고관리자 캠페인 설정으로 이동합니다.",
   "추적 URL 설정에서 추적 경유 사이트를 선택합니다.",
-  "생성된 URL을 붙여넣고 테스트 클릭으로 정상 랜딩을 확인합니다."
+  "생성된 URL을 추적 경유 사이트에 등록합니다."
 ];
 
 function resolveAdvertiserKey(advertiser) {
@@ -178,7 +128,7 @@ export default function TrackingParameterWorkspace() {
   return (
     <AppShell
       title="네이버 경유 추적 URL"
-      description="광고주/사이트 등록에 입력한 랜딩 URL을 기준으로 네이버 광고관리자의 추적 경유 사이트에 등록할 URL을 생성합니다."
+      description="생성된 URL을 네이버 광고관리자의 추적 경유 사이트에 등록해주세요."
     >
       {(notice || error) && (
         <Card className={`p-4 text-sm ${error ? "border-danger/30 bg-danger/10 text-danger" : "border-brand/30 bg-brand/10 text-brand"}`}>
@@ -186,10 +136,10 @@ export default function TrackingParameterWorkspace() {
         </Card>
       )}
 
-      <Card className="border-warning/30 bg-warning/10 p-4 text-sm leading-6 text-warning">
-        <p className="font-semibold">생성된 URL을 네이버 광고관리자의 추적 경유 사이트에 등록해주세요.</p>
-        <p>등록 전 테스트 클릭으로 정상 랜딩 여부를 확인하세요.</p>
-        <p>차단 대상 클릭은 최종 랜딩으로 이동하지 않을 수 있습니다.</p>
+      <Card className="border-brand/30 bg-brand/10 p-4 text-sm leading-6 text-brand">
+        <p className="font-semibold">생성된 URL을 네이버 광고관리자 추적 경유 사이트에 등록해주세요.</p>
+        <p>광고 클릭 시 먼저 로그를 기록한 뒤 정상 클릭만 등록된 랜딩 URL로 이동합니다.</p>
+        <p>네이버 저장 검증 요청은 시스템이 자동으로 처리합니다.</p>
       </Card>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
@@ -197,7 +147,7 @@ export default function TrackingParameterWorkspace() {
           <div className="border-b border-line px-5 py-4">
             <h2 className="text-sm font-bold text-white">광고주와 채널 설정</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              마케터는 광고주를 선택하고 채널만 고르면 됩니다. 추적에 필요한 내부 값은 시스템이 자동으로 처리합니다.
+              광고주를 선택하고 채널을 고르면 추적 경유 URL이 자동으로 생성됩니다.
             </p>
           </div>
           <div className="space-y-4 p-5">
@@ -267,7 +217,7 @@ export default function TrackingParameterWorkspace() {
               생성된 경유 추적 URL
             </h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              네이버 광고관리자의 추적 경유 사이트 입력란에 아래 URL을 그대로 붙여넣습니다.
+              아래 URL을 네이버 광고관리자의 추적 경유 사이트 입력란에 붙여넣습니다.
             </p>
           </div>
           <div className="space-y-4 p-5">
@@ -275,7 +225,7 @@ export default function TrackingParameterWorkspace() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-white">복사할 URL</h3>
-                  <p className="mt-1 text-xs text-slate-500">URL에는 url={"{{final_url}}"} 매크로가 포함됩니다.</p>
+                  <p className="mt-1 text-xs text-slate-500">짧은 URL 형식으로 생성되며 네이버 검증 요청을 자동 처리합니다.</p>
                 </div>
                 <button
                   type="button"
@@ -297,10 +247,6 @@ export default function TrackingParameterWorkspace() {
               <pre className="mt-3 max-h-96 overflow-auto rounded-md border border-line bg-ink p-3 text-xs leading-5 text-slate-400">
                 {trackingUrl ? multilinePreview(trackingUrl) : "줄바꿈 미리보기"}
               </pre>
-            </div>
-
-            <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-xs leading-5 text-warning">
-              네이버가 테스트 클릭에서 {"{{final_url}}"} 매크로를 실제 랜딩 URL로 치환해야 정상 이동합니다. 최종 URL 도메인이 등록된 랜딩 URL과 다르면 서버가 403으로 차단합니다.
             </div>
           </div>
         </Card>

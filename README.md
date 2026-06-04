@@ -258,18 +258,18 @@ https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudt
 2. 추적 URL 화면에서 광고주를 선택하면 등록된 랜딩 URL을 기준으로 경유 URL이 자동 생성됩니다.
 3. 광고주 식별값은 시스템이 `client_id`, `project_key`, `advertiser_id` 순서로 자동 처리합니다.
 4. 네이버 광고계정 식별값은 선택값입니다. 여러 광고계정을 구분해야 할 때만 입력합니다.
-5. 광고 등록 전 테스트 클릭으로 정상 랜딩과 `pm_click_logs` 저장 여부를 확인합니다.
+5. 생성된 URL을 네이버 광고관리자의 추적 경유 사이트에 등록합니다.
 
 파워링크 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/r/naver?c=pl&aid={자동광고주식별값}&url={{final_url}}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/r/naver?c=powerlink&aid={자동광고주식별값}&url={{final_url}}
 ```
 
 쇼핑검색광고 예시:
 
 ```text
-https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/r/naver?c=ns&aid={자동광고주식별값}&url={{final_url}}
+https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudtype.app/r/naver?c=shopping&aid={자동광고주식별값}&url={{final_url}}
 ```
 
 GFA 예시:
@@ -282,8 +282,8 @@ https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudt
 
 지원하는 채널 값:
 
-- 파워링크: `powerlink` 또는 `pl`
-- 쇼핑검색광고: `shopping` 또는 `ns`
+- 파워링크: `powerlink`
+- 쇼핑검색광고: `shopping`
 - GFA: `gfa`
 
 기존 긴 URL도 유지됩니다. `/api/r/naver_powerlink`, `/api/r/naver_shopping`, `/api/r/naver_gfa`는 `pm_adv`, `pm_account`, `n_final_url` 파라미터를 계속 받을 수 있습니다.
@@ -305,7 +305,7 @@ https://port-0-progressmedia-invalid-click-solution-mpnqja589cd2fb94.sel3.cloudt
 - `site_url` 도메인과 다른 `final_url`은 403으로 차단합니다.
 - IP 원문은 저장하지 않고 `ip_hash`, `ip_masked`만 저장합니다.
 - 활성 차단 IP는 `blocking_enabled=false` 상태에서도 최종 랜딩으로 보내지 않습니다.
-- 광고 등록 전 테스트 클릭으로 정상 랜딩과 `pm_click_logs` 저장 여부를 반드시 확인합니다.
+- 네이버 저장 검증 단계에서는 로그를 저장하지 않고 등록된 `site_url`로 즉시 이동합니다.
 
 ## 메뉴/라우트 중복 정리 결과
 
