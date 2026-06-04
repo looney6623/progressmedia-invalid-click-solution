@@ -224,6 +224,12 @@ alter table public.pm_profiles add constraint pm_profiles_role_check check (role
 notify pgrst, 'reload schema';
 ```
 
+## Naver URL registration validation
+
+When Naver Ads validates a tracking redirect URL, it can call the endpoint without a real landing URL. In that validation request, `n_final_url` may be missing or may arrive unchanged as `{final_url}` or `{{final_url}}`.
+
+ProgressMedia treats that request as an endpoint readiness check. The server returns HTTP 200 with the plain text body `ProgressMedia tracking endpoint ready`, does not save a click log, and does not redirect. Final URL validation, click logging, blocked-IP checks, and 302 redirect run only when `n_final_url` or `final_url` contains a real `http` or `https` URL.
+
 ## 네이버 경유 추적 URL 운영 기준
 
 네이버/GFA 연동은 네이버 광고관리자의 `추적 경유 사이트`에 등록할 URL을 생성하는 방식으로 운영합니다. 마케터는 먼저 광고주/사이트 등록에서 랜딩 URL인 `site_url`을 등록하고, 추적 URL 화면에서는 광고주를 선택하기만 하면 됩니다. 시스템은 내부 광고주 식별값을 자동으로 넣어 경유 추적 URL을 생성합니다.

@@ -10,7 +10,7 @@ function json(body, status = 200) {
 }
 
 function readyText() {
-  return new Response("ProgressMedia Tracking Ready", {
+  return new Response("ProgressMedia tracking endpoint ready", {
     status: 200,
     headers: { "Content-Type": "text/plain; charset=utf-8" }
   });
@@ -44,6 +44,11 @@ function blockedUrl(request) {
 
 function readParam(searchParams, key) {
   return (searchParams.get(key) || "").trim();
+}
+
+function isFinalUrlPlaceholder(value) {
+  const normalized = String(value || "").trim();
+  return normalized === "{final_url}" || normalized === "{{final_url}}";
 }
 
 async function findAdvertiser(supabase, advertiserKey) {
@@ -168,11 +173,11 @@ export async function GET(request, context) {
   const finalUrlValue = readParam(params, "n_final_url") || readParam(params, "final_url");
 
   if (!finalUrlValue) return readyText();
+  if (isFinalUrlPlaceholder(finalUrlValue)) return readyText();
   if (!advertiserKey) return json({ ok: false, error: "pm_adv is required" }, 400);
-  if (finalUrlValue === "{final_url}") return json({ ok: false, error: "n_final_url macro was not replaced" }, 400);
 
   const finalUrl = safeUrl(finalUrlValue);
-  if (!finalUrl) return json({ ok: false, error: "invalid final URL" }, 400);
+  if (!finalUrl) return json({ ok: false, error: "invalid final url" }, 400);
 
   if (!hasServerSupabaseConfig()) {
     return json({ ok: false, error: "SERVER_CONFIGURATION_ERROR" }, 503);
