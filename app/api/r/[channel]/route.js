@@ -9,6 +9,13 @@ function json(body, status = 200) {
   return NextResponse.json(body, { status });
 }
 
+function readyText() {
+  return new Response("ProgressMedia Tracking Ready", {
+    status: 200,
+    headers: { "Content-Type": "text/plain; charset=utf-8" }
+  });
+}
+
 function isUuid(value = "") {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -160,8 +167,8 @@ export async function GET(request, context) {
   const advertiserKey = readParam(params, "pm_adv");
   const finalUrlValue = readParam(params, "n_final_url") || readParam(params, "final_url");
 
+  if (!finalUrlValue) return readyText();
   if (!advertiserKey) return json({ ok: false, error: "pm_adv is required" }, 400);
-  if (!finalUrlValue) return json({ ok: false, error: "n_final_url is required" }, 400);
   if (finalUrlValue === "{final_url}") return json({ ok: false, error: "n_final_url macro was not replaced" }, 400);
 
   const finalUrl = safeUrl(finalUrlValue);
