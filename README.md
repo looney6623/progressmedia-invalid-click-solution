@@ -275,25 +275,28 @@ notify pgrst, 'reload schema';
 파워링크 예시:
 
 ```text
-?pm_adv=광고주ID&pm_account=네이버광고계정ID&pm_channel=naver_powerlink&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_ad_extension={ad_extension}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_ad_group_type={ad_group_type}
+pm_adv=광고주ID&pm_account=네이버광고계정ID&pm_channel=naver_powerlink&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_ad_extension={ad_extension}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_ad_group_type={ad_group_type}
 ```
 
 쇼핑검색광고 예시:
 
 ```text
-?pm_adv=광고주ID&pm_account=네이버광고계정ID&pm_channel=naver_shopping&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_mall_id={mall_id}&n_mall_pid={mall_pid}&n_ad_group_type={ad_group_type}
+pm_adv=광고주ID&pm_account=네이버광고계정ID&pm_channel=naver_shopping&n_campaign={campaign}&n_ad_group={ad_group}&n_media={media}&n_ad={ad}&n_keyword={keyword}&n_keyword_id={keyword_id}&n_query={query}&n_match={match}&n_network={network}&n_rank={rank}&n_campaign_type={campaign_type}&n_mall_id={mall_id}&n_mall_pid={mall_pid}&n_ad_group_type={ad_group_type}
 ```
 
 GFA 예시:
 
 ```text
-?pm_adv=광고주ID&pm_account=네이버광고계정ID&pm_channel=naver_gfa&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
+pm_adv=광고주ID&pm_account=네이버광고계정ID&pm_channel=naver_gfa&n_campaign={campaign}&n_group={group}&n_ad={ad}&n_media={media}&n_mall_pid={mall_pid}
 ```
 
-추적 파라미터 화면은 두 가지 복사 문자열을 동시에 제공합니다.
+네이버 설정 기준:
 
-- 랜딩 URL에 `?`가 없으면 `?pm_adv=...`로 시작하는 값을 사용합니다.
-- 랜딩 URL에 이미 `?`가 있으면 `&pm_adv=...`로 시작하는 값을 사용합니다.
+- 네이버 광고관리자에서는 `자동 추적URL 파라미터` 영역을 사용합니다.
+- `추적 경유 사이트`는 사용하지 않습니다.
+- `{{final_url}}`, `final_url`, `n_final_url`은 사용하지 않습니다.
+- 기본 생성값은 `?` 또는 `&` 없이 `key=value&key=value` 형태입니다.
+- 네이버 입력란이 시작 문자를 요구하는 특수한 경우에만 사용자가 직접 `?` 또는 `&`를 앞에 붙입니다.
 
 광고 등록 전에는 반드시 실제 랜딩 URL에 파라미터를 붙여 정상 접속과 `pm_click_logs` 저장 여부를 테스트합니다.
 
